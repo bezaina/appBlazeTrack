@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   Search, 
   SlidersHorizontal, 
@@ -433,154 +434,170 @@ export const RecordsListView: React.FC<RecordsListViewProps> = ({
 
       {/* Records Table / Cards */}
       <div className="bg-[#121216] border border-[#1F1F25] rounded-2xl overflow-hidden shadow-sm">
-        {filteredItems.length === 0 ? (
-          <div className="py-12 text-center space-y-2">
-            <Filter className="w-8 h-8 text-zinc-600 mx-auto" />
-            <p className="text-xs text-zinc-400">
-              Nenhum registo encontrado com os filtros atuais.
-            </p>
-          </div>
-        ) : (
-          <div className="divide-y divide-[#1C1C24]">
-            {filteredItems.map((item) => (
-              <div
-                key={item.id}
-                className="p-4 sm:p-4.5 flex items-center justify-between gap-4 hover:bg-[#16161D] transition-colors"
-              >
-                <div className="flex items-center space-x-3.5 min-w-0">
-                  <div
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
-                      item.type === 'volunteer'
-                        ? 'bg-orange-950/60 border-orange-800/40 text-orange-400'
-                        : item.type === 'instruction'
-                        ? 'bg-yellow-950/60 border-yellow-800/40 text-yellow-400'
-                        : 'bg-emerald-950/60 border-emerald-800/40 text-emerald-400'
-                    }`}
-                  >
-                    {item.type === 'volunteer' && <Flame className="w-4 h-4" />}
-                    {item.type === 'instruction' && <GraduationCap className="w-4 h-4" />}
-                    {item.type === 'gratification' && <Euro className="w-4 h-4" />}
+        <AnimatePresence mode="wait" initial={false}>
+          {filteredItems.length === 0 ? (
+            <motion.div 
+              key="empty-state"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.15 }}
+              className="py-12 text-center space-y-2"
+            >
+              <Filter className="w-8 h-8 text-zinc-600 mx-auto" />
+              <p className="text-xs text-zinc-400">
+                Nenhum registo encontrado com os filtros atuais.
+              </p>
+            </motion.div>
+          ) : (
+            <motion.div 
+              key={`list-${filterType}-${selectedYear}-${selectedMonth}-${selectedOperation}`}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+              className="divide-y divide-[#1C1C24]"
+            >
+              {filteredItems.map((item) => (
+                <div
+                  key={item.id}
+                  className="p-4 sm:p-4.5 flex items-center justify-between gap-4 hover:bg-[#16161D] transition-colors"
+                >
+                  <div className="flex items-center space-x-3.5 min-w-0">
+                    <div
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
+                        item.type === 'volunteer'
+                          ? 'bg-orange-950/60 border-orange-800/40 text-orange-400'
+                          : item.type === 'instruction'
+                          ? 'bg-yellow-950/60 border-yellow-800/40 text-yellow-400'
+                          : 'bg-emerald-950/60 border-emerald-800/40 text-emerald-400'
+                      }`}
+                    >
+                      {item.type === 'volunteer' && <Flame className="w-4 h-4" />}
+                      {item.type === 'instruction' && <GraduationCap className="w-4 h-4" />}
+                      {item.type === 'gratification' && <Euro className="w-4 h-4" />}
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider font-mono">
+                          {formatDatePt(item.date)}
+                        </span>
+                        <span
+                          className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                            item.type === 'volunteer'
+                              ? 'bg-orange-950/60 text-orange-400 border border-orange-900/50'
+                              : item.type === 'instruction'
+                              ? 'bg-yellow-950/60 text-yellow-400 border border-yellow-900/50'
+                              : 'bg-emerald-950/60 text-emerald-400 border border-emerald-900/50'
+                          }`}
+                        >
+                          {item.type === 'volunteer' ? 'Voluntariado' : item.type === 'instruction' ? 'Instrução' : 'Gratificação'}
+                        </span>
+
+                        {/* Quick Gratification Status Badge */}
+                        {item.type === 'gratification' && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onToggleGratificationStatus) onToggleGratificationStatus(item.id);
+                            }}
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center space-x-1 cursor-pointer transition-all ${
+                              (item.rawObj as GratificationRecord).paidStatus === 'Recebido'
+                                ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 hover:bg-emerald-900/70'
+                                : 'bg-amber-950/80 text-amber-300 border border-amber-800/60 hover:bg-amber-900/70'
+                            }`}
+                            title="Clique para alternar estado de pagamento"
+                          >
+                            {(item.rawObj as GratificationRecord).paidStatus === 'Recebido' ? (
+                              <>
+                                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                <span>Pago</span>
+                              </>
+                            ) : (
+                              <>
+                                <Clock className="w-3 h-3 text-amber-400" />
+                                <span>Pendente</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+
+                      <h3 className="text-sm font-bold text-white truncate mt-0.5">
+                        {item.title}
+                      </h3>
+
+                      <p className="text-xs text-zinc-400 truncate max-w-sm sm:max-w-md mt-0.5">
+                        {item.subtitle}
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="min-w-0">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider font-mono">
-                        {formatDatePt(item.date)}
-                      </span>
-                      <span
-                        className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
-                          item.type === 'volunteer'
-                            ? 'bg-orange-950/60 text-orange-400 border border-orange-900/50'
-                            : item.type === 'instruction'
-                            ? 'bg-yellow-950/60 text-yellow-400 border border-yellow-900/50'
-                            : 'bg-emerald-950/60 text-emerald-400 border border-emerald-900/50'
-                        }`}
-                      >
-                        {item.type === 'volunteer' ? 'Voluntariado' : item.type === 'instruction' ? 'Instrução' : 'Gratificação'}
-                      </span>
+                  {/* Right: Metric & Action Buttons */}
+                  <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
+                    <span className="text-sm sm:text-base font-mono font-bold text-zinc-100">
+                      {item.metric}
+                    </span>
 
-                      {/* Quick Gratification Status Badge */}
-                      {item.type === 'gratification' && (
+                    {/* 1-Click Validate Button for Pending Gratifications */}
+                    {item.type === 'gratification' && (item.rawObj as GratificationRecord).paidStatus === 'Pendente' && onToggleGratificationStatus && (
+                      <button
+                        type="button"
+                        onClick={() => onToggleGratificationStatus(item.id)}
+                        className="hidden sm:flex items-center space-x-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-xs transition-all cursor-pointer"
+                        title="Validar pagamento deste registo"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Validar</span>
+                      </button>
+                    )}
+
+                    <div className="flex items-center space-x-1">
+                      <button
+                        onClick={() => {
+                          if (item.type === 'volunteer') onEditVolunteer(item.rawObj as VolunteerServiceRecord);
+                          else if (item.type === 'instruction') onEditInstruction(item.rawObj as InstructionRecord);
+                          else if (item.type === 'gratification') onEditGratification(item.rawObj as GratificationRecord);
+                        }}
+                        className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-[#20202A] transition-colors cursor-pointer"
+                        title="Editar"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+
+                      {deleteConfirmId === item.id ? (
+                        <div className="flex items-center space-x-1 animate-in fade-in duration-150">
+                          <button
+                            onClick={() => handleDelete(item)}
+                            className="px-2 py-1 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                          >
+                            Eliminar
+                          </button>
+                          <button
+                            onClick={() => setDeleteConfirmId(null)}
+                            className="px-2 py-1 bg-zinc-800 text-zinc-300 rounded-lg text-xs transition-colors cursor-pointer"
+                          >
+                            Não
+                          </button>
+                        </div>
+                      ) : (
                         <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (onToggleGratificationStatus) onToggleGratificationStatus(item.id);
-                          }}
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center space-x-1 cursor-pointer transition-all ${
-                            (item.rawObj as GratificationRecord).paidStatus === 'Recebido'
-                              ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 hover:bg-emerald-900/70'
-                              : 'bg-amber-950/80 text-amber-300 border border-amber-800/60 hover:bg-amber-900/70'
-                          }`}
-                          title="Clique para alternar estado de pagamento"
+                          onClick={() => setDeleteConfirmId(item.id)}
+                          className="p-1.5 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-red-950/40 transition-colors cursor-pointer"
+                          title="Eliminar"
                         >
-                          {(item.rawObj as GratificationRecord).paidStatus === 'Recebido' ? (
-                            <>
-                              <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                              <span>Pago</span>
-                            </>
-                          ) : (
-                            <>
-                              <Clock className="w-3 h-3 text-amber-400" />
-                              <span>Pendente</span>
-                            </>
-                          )}
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       )}
                     </div>
-
-                    <h3 className="text-sm font-bold text-white truncate mt-0.5">
-                      {item.title}
-                    </h3>
-
-                    <p className="text-xs text-zinc-400 truncate max-w-sm sm:max-w-md mt-0.5">
-                      {item.subtitle}
-                    </p>
                   </div>
                 </div>
-
-                {/* Right: Metric & Action Buttons */}
-                <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
-                  <span className="text-sm sm:text-base font-mono font-bold text-zinc-100">
-                    {item.metric}
-                  </span>
-
-                  {/* 1-Click Validate Button for Pending Gratifications */}
-                  {item.type === 'gratification' && (item.rawObj as GratificationRecord).paidStatus === 'Pendente' && onToggleGratificationStatus && (
-                    <button
-                      type="button"
-                      onClick={() => onToggleGratificationStatus(item.id)}
-                      className="hidden sm:flex items-center space-x-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-xs transition-all cursor-pointer"
-                      title="Validar pagamento deste registo"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Validar</span>
-                    </button>
-                  )}
-
-                  <div className="flex items-center space-x-1">
-                    <button
-                      onClick={() => {
-                        if (item.type === 'volunteer') onEditVolunteer(item.rawObj as VolunteerServiceRecord);
-                        else if (item.type === 'instruction') onEditInstruction(item.rawObj as InstructionRecord);
-                        else if (item.type === 'gratification') onEditGratification(item.rawObj as GratificationRecord);
-                      }}
-                      className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-[#20202A] transition-colors cursor-pointer"
-                      title="Editar"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                    </button>
-
-                    {deleteConfirmId === item.id ? (
-                      <div className="flex items-center space-x-1 animate-in fade-in duration-150">
-                        <button
-                          onClick={() => handleDelete(item)}
-                          className="px-2 py-1 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
-                        >
-                          Eliminar
-                        </button>
-                        <button
-                          onClick={() => setDeleteConfirmId(null)}
-                          className="px-2 py-1 bg-zinc-800 text-zinc-300 rounded-lg text-xs transition-colors cursor-pointer"
-                        >
-                          Não
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setDeleteConfirmId(item.id)}
-                        className="p-1.5 rounded-lg text-zinc-400 hover:text-red-400 hover:bg-red-950/40 transition-colors cursor-pointer"
-                        title="Eliminar"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

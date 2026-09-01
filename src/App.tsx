@@ -50,6 +50,7 @@ import confetti from 'canvas-confetti';
 import { GoogleUserAccount } from './types';
 import { initGoogleAuth } from './services/googleAuth';
 import { isUserAuthenticated, logoutFirefighter, createGuestProfile } from './services/authService';
+import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
   // Authentication Guard State
@@ -445,164 +446,174 @@ export default function App() {
       {/* Main Content Area (offset by sidebar on desktop, padding for mobile bottom bar) */}
       <div className="flex-1 flex flex-col min-w-0 w-full lg:pl-64 pb-24 lg:pb-8">
         <main className="flex-1 w-full max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8">
-          
-          {/* Tab 1: Dashboard / Início */}
-          {activeTab === 'dashboard' && (
-            <DashboardView
-              volunteerRecords={volunteerRecords}
-              instructionRecords={instructionRecords}
-              gratificationRecords={gratificationRecords}
-              profile={profile}
-              selectedYear={selectedYear}
-              setSelectedYear={setSelectedYear}
-              selectedMonth={selectedMonth}
-              setSelectedMonth={setSelectedMonth}
-              onOpenNewRecord={(type) => handleOpenQuickAdd(type)}
-              onOpenReports={() => setIsReportsModalOpen(true)}
-              setActiveTab={setActiveTab}
-              onToggleGratificationStatus={handleToggleGratificationStatus}
-            />
-          )}
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2, ease: [0.25, 1, 0.5, 1] }}
+              className="w-full"
+            >
+              {/* Tab 1: Dashboard / Início */}
+              {activeTab === 'dashboard' && (
+                <DashboardView
+                  volunteerRecords={volunteerRecords}
+                  instructionRecords={instructionRecords}
+                  gratificationRecords={gratificationRecords}
+                  profile={profile}
+                  selectedYear={selectedYear}
+                  setSelectedYear={setSelectedYear}
+                  selectedMonth={selectedMonth}
+                  setSelectedMonth={setSelectedMonth}
+                  onOpenNewRecord={(type) => handleOpenQuickAdd(type)}
+                  onOpenReports={() => setIsReportsModalOpen(true)}
+                  setActiveTab={setActiveTab}
+                  onToggleGratificationStatus={handleToggleGratificationStatus}
+                />
+              )}
 
-          {/* Tab 2: Registos (Combined All Records) */}
-          {activeTab === 'records' && (
-            <div className="space-y-6">
-              <ActiveShiftWidget
-                activeShift={activeShift}
-                shiftDurationStr={shiftDurationStr}
-                onStartShift={handleStartShift}
-                onStopShift={handleStopShift}
-              />
-              <RecordsListView
-                volunteerRecords={volunteerRecords}
-                instructionRecords={instructionRecords}
-                gratificationRecords={gratificationRecords}
-                profile={profile}
-                onAddNewRecord={(type) => handleOpenQuickAdd(type)}
-                onEditVolunteer={handleEditVolunteer}
-                onEditInstruction={handleEditInstruction}
-                onEditGratification={handleEditGratification}
-                onDeleteVolunteer={handleDeleteVolunteer}
-                onDeleteInstruction={handleDeleteInstruction}
-                onDeleteGratification={handleDeleteGratification}
-                onToggleGratificationStatus={handleToggleGratificationStatus}
-                onOpenReports={() => setIsReportsModalOpen(true)}
-              />
-            </div>
-          )}
+              {/* Tab 2: Registos (Combined All Records) */}
+              {activeTab === 'records' && (
+                <div className="space-y-6">
+                  <ActiveShiftWidget
+                    activeShift={activeShift}
+                    shiftDurationStr={shiftDurationStr}
+                    onStartShift={handleStartShift}
+                    onStopShift={handleStopShift}
+                  />
+                  <RecordsListView
+                    volunteerRecords={volunteerRecords}
+                    instructionRecords={instructionRecords}
+                    gratificationRecords={gratificationRecords}
+                    profile={profile}
+                    onAddNewRecord={(type) => handleOpenQuickAdd(type)}
+                    onEditVolunteer={handleEditVolunteer}
+                    onEditInstruction={handleEditInstruction}
+                    onEditGratification={handleEditGratification}
+                    onDeleteVolunteer={handleDeleteVolunteer}
+                    onDeleteInstruction={handleDeleteInstruction}
+                    onDeleteGratification={handleDeleteGratification}
+                    onToggleGratificationStatus={handleToggleGratificationStatus}
+                    onOpenReports={() => setIsReportsModalOpen(true)}
+                  />
+                </div>
+              )}
 
-          {/* Tab 3: Calendário */}
-          {activeTab === 'calendar' && (
-            <CalendarView
-              volunteerRecords={volunteerRecords}
-              instructionRecords={instructionRecords}
-              gratificationRecords={gratificationRecords}
-              calendarTasks={calendarTasks}
-              onAddTask={handleAddCalendarTask}
-              onToggleTask={handleToggleCalendarTask}
-              onDeleteTask={handleDeleteCalendarTask}
-              profile={profile}
-              onAddNewRecord={(type) => handleOpenQuickAdd(type)}
-              onSelectRecord={(r) => {
-                if ('serviceType' in r) handleEditVolunteer(r as VolunteerServiceRecord);
-                else if ('topic' in r) handleEditInstruction(r as InstructionRecord);
-                else handleEditGratification(r as GratificationRecord);
-              }}
-              onToggleGratificationStatus={handleToggleGratificationStatus}
-            />
-          )}
+              {/* Tab 3: Calendário */}
+              {activeTab === 'calendar' && (
+                <CalendarView
+                  volunteerRecords={volunteerRecords}
+                  instructionRecords={instructionRecords}
+                  gratificationRecords={gratificationRecords}
+                  calendarTasks={calendarTasks}
+                  onAddTask={handleAddCalendarTask}
+                  onToggleTask={handleToggleCalendarTask}
+                  onDeleteTask={handleDeleteCalendarTask}
+                  profile={profile}
+                  onAddNewRecord={(type) => handleOpenQuickAdd(type)}
+                  onSelectRecord={(r) => {
+                    if ('serviceType' in r) handleEditVolunteer(r as VolunteerServiceRecord);
+                    else if ('topic' in r) handleEditInstruction(r as InstructionRecord);
+                    else handleEditGratification(r as GratificationRecord);
+                  }}
+                  onToggleGratificationStatus={handleToggleGratificationStatus}
+                />
+              )}
 
-          {/* Tab 4: Voluntariado */}
-          {activeTab === 'volunteer' && (
-            <VolunteerHoursView
-              records={volunteerRecords}
-              profile={profile}
-              selectedYear={selectedYear}
-              setSelectedYear={setSelectedYear}
-              selectedMonth={selectedMonth}
-              setSelectedMonth={setSelectedMonth}
-              onAddNew={() => handleOpenQuickAdd('volunteer')}
-              onEdit={handleEditVolunteer}
-              onDelete={handleDeleteVolunteer}
-            />
-          )}
+              {/* Tab 4: Voluntariado */}
+              {activeTab === 'volunteer' && (
+                <VolunteerHoursView
+                  records={volunteerRecords}
+                  profile={profile}
+                  selectedYear={selectedYear}
+                  setSelectedYear={setSelectedYear}
+                  selectedMonth={selectedMonth}
+                  setSelectedMonth={setSelectedMonth}
+                  onAddNew={() => handleOpenQuickAdd('volunteer')}
+                  onEdit={handleEditVolunteer}
+                  onDelete={handleDeleteVolunteer}
+                />
+              )}
 
-          {/* Tab 5: Instrução */}
-          {activeTab === 'instruction' && (
-            <InstructionHoursView
-              records={instructionRecords}
-              profile={profile}
-              selectedYear={selectedYear}
-              setSelectedYear={setSelectedYear}
-              selectedMonth={selectedMonth}
-              setSelectedMonth={setSelectedMonth}
-              onAddNew={() => handleOpenQuickAdd('instruction')}
-              onEdit={handleEditInstruction}
-              onDelete={handleDeleteInstruction}
-            />
-          )}
+              {/* Tab 5: Instrução */}
+              {activeTab === 'instruction' && (
+                <InstructionHoursView
+                  records={instructionRecords}
+                  profile={profile}
+                  selectedYear={selectedYear}
+                  setSelectedYear={setSelectedYear}
+                  selectedMonth={selectedMonth}
+                  setSelectedMonth={setSelectedMonth}
+                  onAddNew={() => handleOpenQuickAdd('instruction')}
+                  onEdit={handleEditInstruction}
+                  onDelete={handleDeleteInstruction}
+                />
+              )}
 
-          {/* Tab 6: Gratificações */}
-          {activeTab === 'gratifications' && (
-            <GratificationsView
-              records={gratificationRecords}
-              profile={profile}
-              selectedYear={selectedYear}
-              setSelectedYear={setSelectedYear}
-              selectedMonth={selectedMonth}
-              setSelectedMonth={setSelectedMonth}
-              onAddNew={() => handleOpenQuickAdd('gratification')}
-              onEdit={handleEditGratification}
-              onDelete={handleDeleteGratification}
-              onToggleStatus={handleToggleGratificationStatus}
-              onValidateAllPending={handleValidateAllPendingGratifications}
-            />
-          )}
+              {/* Tab 6: Gratificações */}
+              {activeTab === 'gratifications' && (
+                <GratificationsView
+                  records={gratificationRecords}
+                  profile={profile}
+                  selectedYear={selectedYear}
+                  setSelectedYear={setSelectedYear}
+                  selectedMonth={selectedMonth}
+                  setSelectedMonth={setSelectedMonth}
+                  onAddNew={() => handleOpenQuickAdd('gratification')}
+                  onEdit={handleEditGratification}
+                  onDelete={handleDeleteGratification}
+                  onToggleStatus={handleToggleGratificationStatus}
+                  onValidateAllPending={handleValidateAllPendingGratifications}
+                />
+              )}
 
-          {/* Tab 7: Estatísticas */}
-          {activeTab === 'stats' && (
-            <StatsView
-              volunteerRecords={volunteerRecords}
-              instructionRecords={instructionRecords}
-              gratificationRecords={gratificationRecords}
-              profile={profile}
-              selectedYear={selectedYear}
-              setSelectedYear={setSelectedYear}
-              onOpenSupabaseConnect={() => setIsSupabaseModalOpen(true)}
-            />
-          )}
+              {/* Tab 7: Estatísticas */}
+              {activeTab === 'stats' && (
+                <StatsView
+                  volunteerRecords={volunteerRecords}
+                  instructionRecords={instructionRecords}
+                  gratificationRecords={gratificationRecords}
+                  profile={profile}
+                  selectedYear={selectedYear}
+                  setSelectedYear={setSelectedYear}
+                  onOpenSupabaseConnect={() => setIsSupabaseModalOpen(true)}
+                />
+              )}
 
-          {/* Tab 8: Relatórios / Exportar */}
-          {activeTab === 'reports' && (
-            <div className="space-y-6">
-              <ExportReportsModal
-                isOpen={true}
-                onClose={() => setActiveTab('dashboard')}
-                volunteerRecords={volunteerRecords}
-                instructionRecords={instructionRecords}
-                gratificationRecords={gratificationRecords}
-                profile={profile}
-                initialYear={selectedYear}
-                initialMonth={selectedMonth}
-              />
-            </div>
-          )}
+              {/* Tab 8: Relatórios / Exportar */}
+              {activeTab === 'reports' && (
+                <div className="space-y-6">
+                  <ExportReportsModal
+                    isOpen={true}
+                    onClose={() => setActiveTab('dashboard')}
+                    volunteerRecords={volunteerRecords}
+                    instructionRecords={instructionRecords}
+                    gratificationRecords={gratificationRecords}
+                    profile={profile}
+                    initialYear={selectedYear}
+                    initialMonth={selectedMonth}
+                  />
+                </div>
+              )}
 
-          {/* Tab 9: Definições & Perfil */}
-          {activeTab === 'settings' && (
-            <ProfileSettingsView
-              profile={profile}
-              onUpdateProfile={setProfile}
-              onOpenGoogleAuth={() => setIsGoogleAuthOpen(true)}
-              onOpenAuthModal={() => setIsAuthModalOpen(true)}
-              onLogout={handleLogout}
-              volunteerRecords={volunteerRecords}
-              instructionRecords={instructionRecords}
-              gratificationRecords={gratificationRecords}
-              onRestoreAllData={handleRestoreAllData}
-              onClearAllData={handleClearAllData}
-            />
-          )}
+              {/* Tab 9: Definições & Perfil */}
+              {activeTab === 'settings' && (
+                <ProfileSettingsView
+                  profile={profile}
+                  onUpdateProfile={setProfile}
+                  onOpenGoogleAuth={() => setIsGoogleAuthOpen(true)}
+                  onOpenAuthModal={() => setIsAuthModalOpen(true)}
+                  onLogout={handleLogout}
+                  volunteerRecords={volunteerRecords}
+                  instructionRecords={instructionRecords}
+                  gratificationRecords={gratificationRecords}
+                  onRestoreAllData={handleRestoreAllData}
+                  onClearAllData={handleClearAllData}
+                />
+              )}
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
 
