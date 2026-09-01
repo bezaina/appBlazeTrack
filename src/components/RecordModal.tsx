@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, 
   Clock, 
@@ -13,7 +13,8 @@ import {
   Award, 
   Calculator,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  MoveHorizontal
 } from 'lucide-react';
 import { 
   VolunteerServiceRecord, 
@@ -330,13 +331,63 @@ export const RecordModal: React.FC<RecordModalProps> = ({
     onClose();
   };
 
+  const RECORD_TABS: ModalRecordType[] = ['volunteer', 'instruction', 'gratification'];
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchStartY, setTouchStartY] = useState<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStartX(e.touches[0].clientX);
+    setTouchStartY(e.touches[0].clientY);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX === null || touchStartY === null || isEditing) return;
+
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
+
+    const deltaX = touchEndX - touchStartX;
+    const deltaY = touchEndY - touchStartY;
+
+    // Detect intentional horizontal swipe (horizontal movement exceeds vertical movement significantly)
+    if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.3) {
+      const currentIndex = RECORD_TABS.indexOf(recordType);
+      if (deltaX < 0 && currentIndex < RECORD_TABS.length - 1) {
+        // Swiped Left -> Move to Next Tab
+        const nextType = RECORD_TABS[currentIndex + 1];
+        setRecordType(nextType);
+        if (nextType === 'gratification' && !amount) {
+          setAmount(getRateForType(gratType));
+        }
+      } else if (deltaX > 0 && currentIndex > 0) {
+        // Swiped Right -> Move to Previous Tab
+        const prevType = RECORD_TABS[currentIndex - 1];
+        setRecordType(prevType);
+        if (prevType === 'gratification' && !amount) {
+          setAmount(getRateForType(gratType));
+        }
+      }
+    }
+
+    setTouchStartX(null);
+    setTouchStartY(null);
+  };
+
   const isEditing = !!recordToEdit;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-[#14141A] rounded-2xl max-w-xl w-full shadow-2xl border border-[#242430] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div 
+      className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overscroll-y-contain"
+      style={{ overscrollBehaviorY: 'contain' }}
+    >
+      <div 
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        className="bg-[#14141A] rounded-2xl max-w-xl w-full shadow-2xl border border-[#242430] overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh] overscroll-y-contain"
+        style={{ overscrollBehaviorY: 'contain' }}
+      >
         {/* Header */}
-        <div className="px-5 py-4 border-b border-[#242430] flex items-center justify-between bg-[#101014]">
+        <div className="px-5 py-4 border-b border-[#242430] flex items-center justify-between bg-[#101014] shrink-0">
           <div>
             <h3 className="font-bold text-zinc-100 text-lg">
               {isEditing ? 'Editar Registo' : 'Novo Registo Operacional'}
@@ -353,52 +404,72 @@ export const RecordModal: React.FC<RecordModalProps> = ({
           </button>
         </div>
 
-        {/* Tab Selector (only when creating new) */}
+        {/* Tab Selector & Mobile Swipe Indicator (only when creating new) */}
         {!isEditing && (
-          <div className="p-2.5 bg-[#181820] border-b border-[#242430] flex space-x-1.5">
-            <button
-              type="button"
-              onClick={() => setRecordType('volunteer')}
-              className={`flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center space-x-2 transition-all cursor-pointer ${
-                recordType === 'volunteer'
-                  ? 'bg-red-950/70 border border-red-800/60 text-red-300 shadow-xs'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-[#1F1F2A]'
-              }`}
-            >
-              <Clock className="w-4 h-4" />
-              <span>Voluntariado</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setRecordType('instruction')}
-              className={`flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center space-x-2 transition-all cursor-pointer ${
-                recordType === 'instruction'
-                  ? 'bg-blue-950/70 border border-blue-800/60 text-blue-300 shadow-xs'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-[#1F1F2A]'
-              }`}
-            >
-              <GraduationCap className="w-4 h-4" />
-              <span>Instrução</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setRecordType('gratification');
-                if (!amount) setAmount(getRateForType(gratType));
-              }}
-              className={`flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center space-x-2 transition-all cursor-pointer ${
-                recordType === 'gratification'
-                  ? 'bg-emerald-950/70 border border-emerald-800/60 text-emerald-300 shadow-xs'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-[#1F1F2A]'
-              }`}
-            >
-              <Euro className="w-4 h-4" />
-              <span>Gratificação</span>
-            </button>
+          <div className="bg-[#181820] border-b border-[#242430] shrink-0">
+            <div className="p-2.5 flex space-x-1.5">
+              <button
+                type="button"
+                onClick={() => setRecordType('volunteer')}
+                className={`flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center space-x-2 transition-all cursor-pointer ${
+                  recordType === 'volunteer'
+                    ? 'bg-red-950/70 border border-red-800/60 text-red-300 shadow-xs'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-[#1F1F2A]'
+                }`}
+              >
+                <Clock className="w-4 h-4" />
+                <span>Voluntariado</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setRecordType('instruction')}
+                className={`flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center space-x-2 transition-all cursor-pointer ${
+                  recordType === 'instruction'
+                    ? 'bg-blue-950/70 border border-blue-800/60 text-blue-300 shadow-xs'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-[#1F1F2A]'
+                }`}
+              >
+                <GraduationCap className="w-4 h-4" />
+                <span>Instrução</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setRecordType('gratification');
+                  if (!amount) setAmount(getRateForType(gratType));
+                }}
+                className={`flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center space-x-2 transition-all cursor-pointer ${
+                  recordType === 'gratification'
+                    ? 'bg-emerald-950/70 border border-emerald-800/60 text-emerald-300 shadow-xs'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-[#1F1F2A]'
+                }`}
+              >
+                <Euro className="w-4 h-4" />
+                <span>Gratificação</span>
+              </button>
+            </div>
+
+            {/* Mobile Horizontal Navigation Indicator */}
+            <div className="sm:hidden px-3 pb-1.5 flex items-center justify-between text-[10px] text-zinc-500 font-medium">
+              <span className="flex items-center space-x-1">
+                <MoveHorizontal className="w-3 h-3 text-orange-400 animate-pulse" />
+                <span>Deslize horizontalmente para mudar de tipo</span>
+              </span>
+              <div className="flex space-x-1">
+                {RECORD_TABS.map((tab) => (
+                  <span 
+                    key={tab} 
+                    className={`w-1.5 h-1.5 rounded-full transition-all ${
+                      recordType === tab ? 'bg-orange-500 w-3' : 'bg-zinc-700'
+                    }`} 
+                  />
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
-        <form onSubmit={handleSave} className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+        <form onSubmit={handleSave} className="p-5 space-y-4 overflow-y-auto flex-1 overscroll-y-contain">
           {errorMessage && (
             <div className="p-3 rounded-xl bg-red-950/60 border border-red-800/50 text-red-300 text-xs flex items-center space-x-2">
               <AlertCircle className="w-4 h-4 shrink-0" />

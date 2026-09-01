@@ -14,7 +14,8 @@ import {
   Download, 
   Calendar, 
   CheckCircle2, 
-  Check 
+  Check,
+  MoveHorizontal
 } from 'lucide-react';
 import { 
   VolunteerServiceRecord, 
@@ -96,6 +97,37 @@ export const RecordsListView: React.FC<RecordsListViewProps> = ({
   const [selectedOperation, setSelectedOperation] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  const FILTER_TABS: Array<'all' | 'volunteer' | 'instruction' | 'gratification'> = ['all', 'volunteer', 'instruction', 'gratification'];
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchStartY, setTouchStartY] = useState<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStartX(e.touches[0].clientX);
+    setTouchStartY(e.touches[0].clientY);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX === null || touchStartY === null) return;
+
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
+
+    const deltaX = touchEndX - touchStartX;
+    const deltaY = touchEndY - touchStartY;
+
+    if (Math.abs(deltaX) > 45 && Math.abs(deltaX) > Math.abs(deltaY) * 1.3) {
+      const currentIndex = FILTER_TABS.indexOf(filterType);
+      if (deltaX < 0 && currentIndex < FILTER_TABS.length - 1) {
+        handleTabChange(FILTER_TABS[currentIndex + 1]);
+      } else if (deltaX > 0 && currentIndex > 0) {
+        handleTabChange(FILTER_TABS[currentIndex - 1]);
+      }
+    }
+
+    setTouchStartX(null);
+    setTouchStartY(null);
+  };
 
   const handleTabChange = (type: 'all' | 'volunteer' | 'instruction' | 'gratification') => {
     setFilterType(type);
@@ -250,7 +282,11 @@ export const RecordsListView: React.FC<RecordsListViewProps> = ({
       </div>
 
       {/* Filter Tabs & Month/Operation Filters Bar */}
-      <div className="bg-[#121216] border border-[#1F1F25] rounded-2xl p-4 space-y-3">
+      <div 
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        className="bg-[#121216] border border-[#1F1F25] rounded-2xl p-4 space-y-3 overscroll-y-contain"
+      >
         {/* Category Pills */}
         <div className="flex flex-wrap items-center gap-1.5 bg-[#181820] p-1.5 rounded-xl border border-[#242430]">
           <button
@@ -299,6 +335,24 @@ export const RecordsListView: React.FC<RecordsListViewProps> = ({
             <Euro className="w-3.5 h-3.5" />
             <span>Gratificações ({gratificationRecords.length})</span>
           </button>
+        </div>
+
+        {/* Mobile swipe helper */}
+        <div className="sm:hidden flex items-center justify-between text-[10px] text-zinc-500 font-medium px-1">
+          <span className="flex items-center space-x-1">
+            <MoveHorizontal className="w-3 h-3 text-orange-400 animate-pulse" />
+            <span>Deslize horizontalmente para alternar categorias</span>
+          </span>
+          <div className="flex space-x-1">
+            {FILTER_TABS.map((tab) => (
+              <span 
+                key={tab} 
+                className={`w-1.5 h-1.5 rounded-full transition-all ${
+                  filterType === tab ? 'bg-orange-500 w-3' : 'bg-zinc-700'
+                }`} 
+              />
+            ))}
+          </div>
         </div>
 
         {/* Dropdown Filters: Month, Year, Operation/Gratification Type, Search */}
