@@ -41,14 +41,17 @@ import {
   createGuestProfile,
   getActiveAccount,
   accountToProfile,
-  getSavedAccounts 
+  getSavedAccounts,
+  updateActiveAccountFromProfile 
 } from '../services/authService';
+import { EmailServiceConfigModal } from './EmailServiceConfigModal';
 
 interface ProfileSettingsViewProps {
   profile: UserProfile;
   onUpdateProfile: (updated: UserProfile) => void;
   onOpenGoogleAuth: () => void;
   onOpenAuthModal?: () => void;
+  onOpenSupabaseConnect?: () => void;
   onLogout?: () => void;
   volunteerRecords: VolunteerServiceRecord[];
   instructionRecords: InstructionRecord[];
@@ -90,6 +93,7 @@ export const ProfileSettingsView: React.FC<ProfileSettingsViewProps> = ({
   onUpdateProfile,
   onOpenGoogleAuth,
   onOpenAuthModal,
+  onOpenSupabaseConnect,
   onLogout,
   volunteerRecords,
   instructionRecords,
@@ -102,8 +106,8 @@ export const ProfileSettingsView: React.FC<ProfileSettingsViewProps> = ({
   const [corpsName, setCorpsName] = useState(profile.corpsName);
   const [rank, setRank] = useState(profile.rank);
   const [monthlyTargetHours, setMonthlyTargetHours] = useState(profile.monthlyTargetHours || 35);
-  const [pinEnabled, setPinEnabled] = useState(profile.pinEnabled);
-  const [pinCode, setPinCode] = useState(profile.pinHash || '1234');
+  const [pinEnabled, setPinEnabled] = useState(profile.pinEnabled ?? false);
+  const [pinCode, setPinCode] = useState(profile.pinHash || '');
   const [showReminder, setShowReminder] = useState(profile.showReminder ?? true);
 
   // Gratification rates state
@@ -118,6 +122,7 @@ export const ProfileSettingsView: React.FC<ProfileSettingsViewProps> = ({
   const [emailReportPeriod, setEmailReportPeriod] = useState<'monthly' | 'annual'>(profile.autoEmailReportPeriod || 'monthly');
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [emailSentResult, setEmailSentResult] = useState<EmailDispatchResult | null>(null);
+  const [isEmailConfigModalOpen, setIsEmailConfigModalOpen] = useState(false);
 
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -190,6 +195,8 @@ export const ProfileSettingsView: React.FC<ProfileSettingsViewProps> = ({
       return;
     }
 
+    const pinChanged = profile.pinHash !== pinCode;
+
     const updated: UserProfile = {
       ...profile,
       name: name.trim(),
@@ -208,8 +215,20 @@ export const ProfileSettingsView: React.FC<ProfileSettingsViewProps> = ({
     };
 
     onUpdateProfile(updated);
-    setFeedbackMessage({ type: 'success', text: 'Perfil, tabela de gratificações e definições de email guardadas com sucesso.' });
-    setTimeout(() => setFeedbackMessage(null), 3500);
+    updateActiveAccountFromProfile(updated);
+
+    if (pinEnabled && pinChanged) {
+      setFeedbackMessage({ 
+        type: 'success', 
+        text: 'Novo PIN de 4 dígitos guardado com sucesso! O PIN padrão foi imediatamente desativado.' 
+      });
+    } else {
+      setFeedbackMessage({ 
+        type: 'success', 
+        text: 'Perfil, tabela de gratificações e definições de segurança guardadas com sucesso.' 
+      });
+    }
+    setTimeout(() => setFeedbackMessage(null), 4000);
   };
 
   const handleSendEmailReportNow = async () => {
@@ -800,23 +819,51 @@ export const ProfileSettingsView: React.FC<ProfileSettingsViewProps> = ({
                   <span className="flex items-center space-x-1 text-emerald-400"><FileCode className="w-3.5 h-3.5" /><span>JSON</span></span>
                 </div>
 
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEmailConfigModalOpen(true)}
+                    className="px-3 py-2 bg-[#20202C] hover:bg-[#2A2A3A] border border-[#34344A] text-zinc-200 hover:text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 cursor-pointer transition-colors"
+                  >
+                    <Mail className="w-3.5 h-3.5 text-orange-400" />
+                    <span>Configurar & Testar SMTP</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSendEmailReportNow}
+                    disabled={isSendingEmail}
+                    className="px-4 py-2 bg-orange-600 hover:bg-orange-500 active:bg-orange-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 cursor-pointer shadow-xs transition-colors disabled:opacity-50"
+                  >
+                    {isSendingEmail ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>A Enviar Relatório...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Enviar Relatório ({emailReportPeriod === 'annual' ? 'Anual' : 'Mensal'}) Agora</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick SMTP Diagnostics Notice */}
+              <div className="p-3 bg-[#161622] rounded-xl border border-[#262638] flex items-center justify-between text-xs">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-zinc-300">
+                    <strong>Serviço SMTP Supabase:</strong> Pronto para envio de verificações, recuperação de PIN e redefinição de palavra-passe.
+                  </span>
+                </div>
                 <button
                   type="button"
-                  onClick={handleSendEmailReportNow}
-                  disabled={isSendingEmail}
-                  className="px-4 py-2 bg-orange-600 hover:bg-orange-500 active:bg-orange-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 cursor-pointer shadow-xs transition-colors disabled:opacity-50"
+                  onClick={() => setIsEmailConfigModalOpen(true)}
+                  className="text-orange-400 hover:text-orange-300 font-bold underline text-xs cursor-pointer shrink-0 ml-2"
                 >
-                  {isSendingEmail ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>A Enviar Relatório...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-3.5 h-3.5" />
-                      <span>Enviar Relatório ({emailReportPeriod === 'annual' ? 'Anual' : 'Mensal'}) Agora</span>
-                    </>
-                  )}
+                  Abrir Diagnóstico
                 </button>
               </div>
             </div>
@@ -830,7 +877,7 @@ export const ProfileSettingsView: React.FC<ProfileSettingsViewProps> = ({
               <ShieldCheck className="w-4 h-4 text-red-500" />
               <span>Proteção de Dados & Código PIN</span>
             </h3>
-            <span className="text-xs text-zinc-400">Proteção local no dispositivo</span>
+            <span className="text-xs text-zinc-400">Proteção de acesso</span>
           </div>
 
           <div className="flex items-center justify-between p-3.5 bg-[#181820] rounded-xl border border-[#242430]">
@@ -839,7 +886,7 @@ export const ProfileSettingsView: React.FC<ProfileSettingsViewProps> = ({
                 Bloqueio de Ecrã com Código PIN
               </span>
               <span className="text-xs text-zinc-400">
-                Exige código PIN de 4 dígitos ao iniciar ou bloquear a aplicação.
+                Por definição não existe PIN. Ao ativar esta função, define o seu PIN de 4 dígitos para proteger o acesso.
               </span>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
@@ -854,21 +901,54 @@ export const ProfileSettingsView: React.FC<ProfileSettingsViewProps> = ({
           </div>
 
           {pinEnabled && (
-            <div className="p-3 bg-red-950/30 rounded-xl border border-red-900/40">
-              <label className="block text-xs font-semibold text-zinc-300 mb-1">
-                Definir Código PIN (4 dígitos numéricos)
-              </label>
-              <input
-                type="password"
-                maxLength={4}
-                value={pinCode}
-                onChange={(e) => setPinCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                placeholder="Ex: 1234"
-                className="w-32 px-3 py-2 text-center text-lg font-mono font-bold tracking-widest bg-[#18181F] border border-[#282834] rounded-xl text-zinc-100 outline-none"
-              />
-              <span className="text-[11px] text-zinc-400 block mt-1">
-                Guarde bem este código para desbloquear os seus registos.
-              </span>
+            <div className="p-4 bg-red-950/20 rounded-xl border border-red-900/40 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <label className="block text-xs font-bold text-zinc-200">
+                    Definir Código PIN (4 dígitos numéricos)
+                  </label>
+                  <span className="text-[11px] text-zinc-400">
+                    Introduza o código de 4 dígitos a solicitar ao entrar na aplicação.
+                  </span>
+                </div>
+                {pinCode && pinCode.length === 4 && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-950/70 text-emerald-300 border border-emerald-800/50 w-fit">
+                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                    PIN Definido ({pinCode.length}/4)
+                  </span>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  type="password"
+                  maxLength={4}
+                  value={pinCode}
+                  onChange={(e) => setPinCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  placeholder="Ex: 5678"
+                  className="w-36 px-3 py-2.5 text-center text-xl font-mono font-bold tracking-widest bg-[#18181F] border border-[#282834] focus:border-red-500 rounded-xl text-zinc-100 outline-none transition-colors"
+                />
+                <span className="text-xs text-zinc-400 font-mono">
+                  {pinCode.length}/4 dígitos
+                </span>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const randomPin = Math.floor(1000 + Math.random() * 9000).toString();
+                      setPinCode(randomPin);
+                    }}
+                    className="px-2.5 py-1.5 rounded-lg bg-[#20202A] hover:bg-[#282836] border border-[#303040] text-[11px] font-semibold text-zinc-300 hover:text-white transition-colors cursor-pointer"
+                  >
+                    Gerar Aleatório
+                  </button>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-zinc-400 bg-[#14141A] p-2.5 rounded-lg border border-[#22222E]">
+                • <strong className="text-zinc-200">Segurança:</strong> O PIN só pode ser alterado ou recuperado mediante autorização por email com código temporário enviado para o seu endereço registado.
+              </p>
             </div>
           )}
         </div>
@@ -926,10 +1006,10 @@ export const ProfileSettingsView: React.FC<ProfileSettingsViewProps> = ({
                   Conecte a sua base de dados Supabase diretamente introduzindo o URL e a chave anon no modal de conexão.
                 </p>
               </div>
-              {onOpenAuthModal && (
+              {onOpenSupabaseConnect && (
                 <button
                   type="button"
-                  onClick={onOpenAuthModal}
+                  onClick={onOpenSupabaseConnect}
                   className="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
                 >
                   <Database className="w-3.5 h-3.5" />
@@ -1088,6 +1168,13 @@ export const ProfileSettingsView: React.FC<ProfileSettingsViewProps> = ({
           <strong className="font-semibold text-emerald-200">Modo 100% Offline & Privacidade Total:</strong> Todos os seus registos são guardados localmente no seu dispositivo. Não são enviados dados confidenciais de ocorrências ou gratificações para servidores externos sem o seu consentimento.
         </div>
       </div>
+
+      {/* Email & SMTP Configuration & Testing Modal */}
+      <EmailServiceConfigModal
+        isOpen={isEmailConfigModalOpen}
+        onClose={() => setIsEmailConfigModalOpen(false)}
+        profile={profile}
+      />
     </div>
   );
 };

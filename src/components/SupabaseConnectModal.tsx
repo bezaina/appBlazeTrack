@@ -9,14 +9,19 @@ import {
   ShieldCheck, 
   ArrowRight,
   Sparkles,
-  Unplug
+  Unplug,
+  RotateCcw,
+  RefreshCw
 } from 'lucide-react';
 import { 
   getSupabaseConfig, 
   setCustomSupabaseConfig, 
   disconnectSupabase, 
+  reconnectDefaultSupabase,
   isSupabaseConfigured,
-  getSupabase 
+  testSupabaseConnection,
+  SUPABASE_PROJECT_NAME,
+  SUPABASE_PROJECT_ID
 } from '../services/supabase';
 
 interface SupabaseConnectModalProps {
@@ -48,6 +53,19 @@ export const SupabaseConnectModal: React.FC<SupabaseConnectModalProps> = ({
 
   if (!isOpen) return null;
 
+  const handleResetToDefaultProject = () => {
+    reconnectDefaultSupabase();
+    const config = getSupabaseConfig();
+    setSupabaseUrl(config.url);
+    setSupabaseKey(config.key);
+    setIsConnected(true);
+    setTestResult({
+      success: true,
+      message: `Restaurado para o projeto ${SUPABASE_PROJECT_NAME} (ID: ${SUPABASE_PROJECT_ID}).`,
+    });
+    if (onConnectionChanged) onConnectionChanged(true);
+  };
+
   const handleTestAndSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanUrl = supabaseUrl.trim();
@@ -74,32 +92,16 @@ export const SupabaseConnectModal: React.FC<SupabaseConnectModalProps> = ({
 
     try {
       setCustomSupabaseConfig(cleanUrl, cleanKey);
-      const client = getSupabase();
-      
-      if (!client) {
-        throw new Error('Não foi possível inicializar o cliente Supabase.');
+      const res = await testSupabaseConnection(cleanUrl, cleanKey);
+
+      if (!res.success) {
+        throw new Error(res.message || 'Falha ao validar ligação com o Supabase.');
       }
 
-      const { error } = await client
-        .from('user_profiles')
-        .select('id')
-        .limit(1);
-
-      if (error && error.code !== 'PGRST116') {
-        if (error.message.includes('relation') || error.message.includes('does not exist')) {
-          setTestResult({
-            success: true,
-            message: 'Ligado com sucesso ao Supabase! Lembre-se de executar as tabelas no SQL Editor.',
-          });
-        } else {
-          throw new Error(error.message || 'Falha na resposta do Supabase.');
-        }
-      } else {
-        setTestResult({
-          success: true,
-          message: 'Base de dados Supabase conectada e sincronizada com sucesso!',
-        });
-      }
+      setTestResult({
+        success: true,
+        message: res.message || 'Base de dados Supabase conectada e sincronizada com sucesso!',
+      });
 
       setIsConnected(true);
       if (onConnectionChanged) onConnectionChanged(true);
@@ -141,18 +143,18 @@ export const SupabaseConnectModal: React.FC<SupabaseConnectModalProps> = ({
             <div>
               <div className="flex items-center space-x-2">
                 <h3 className="text-lg font-black text-white tracking-tight">
-                  Conectar Base de Dados
+                  Conexão Supabase DB
                 </h3>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider font-mono border ${
                   isConnected 
                     ? 'bg-emerald-950/80 border-emerald-700 text-emerald-400' 
                     : 'bg-amber-950/80 border-amber-800 text-amber-300'
                 }`}>
-                  {isConnected ? 'Conectada' : 'Não Conectada'}
+                  {isConnected ? 'Conectado' : 'Desconectado'}
                 </span>
               </div>
               <p className="text-xs text-zinc-400">
-                Integração direta com Supabase PostgreSQL para persistência na nuvem
+                {SUPABASE_PROJECT_NAME} (ID: <span className="font-mono text-emerald-400">{SUPABASE_PROJECT_ID}</span>)
               </p>
             </div>
           </div>
@@ -184,28 +186,26 @@ export const SupabaseConnectModal: React.FC<SupabaseConnectModalProps> = ({
             </div>
           )}
 
-          {/* Quick Guide Card */}
-          <div className="p-3.5 bg-[#171322] border border-[#2B223E] rounded-2xl space-y-2 text-xs">
-            <div className="flex items-center justify-between text-zinc-200 font-bold">
-              <span className="flex items-center space-x-1.5 text-emerald-400">
-                <Sparkles className="w-4 h-4" />
-                <span>Onde encontrar as credenciais no Supabase?</span>
+          {/* Connected Project Info Box */}
+          <div className="p-3.5 bg-emerald-950/30 border border-emerald-800/40 rounded-2xl space-y-1.5 text-xs">
+            <div className="flex items-center justify-between text-emerald-300 font-bold">
+              <span className="flex items-center space-x-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>Base de Dados Principal Configurada</span>
               </span>
-              <a
-                href="https://supabase.com/dashboard"
-                target="_blank"
-                rel="noreferrer"
-                className="text-[11px] text-zinc-400 hover:text-white flex items-center space-x-1 underline"
+              <button
+                type="button"
+                onClick={handleResetToDefaultProject}
+                className="text-[11px] text-zinc-400 hover:text-emerald-300 flex items-center space-x-1 underline cursor-pointer"
+                title="Repor credenciais oficiais do projeto jagamaal@gmail.com"
               >
-                <span>Abrir Supabase</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
+                <RotateCcw className="w-3 h-3" />
+                <span>Restaurar Padrão</span>
+              </button>
             </div>
-            <ol className="list-decimal list-inside text-zinc-400 space-y-1 text-[11px]">
-              <li>Aceda ao seu projeto em <strong className="text-zinc-300">supabase.com</strong></li>
-              <li>Vá a <strong className="text-zinc-300">Project Settings → API</strong></li>
-              <li>Copie o <strong className="text-zinc-300">Project URL</strong> e a <strong className="text-zinc-300">anon / public key</strong></li>
-            </ol>
+            <p className="text-[11px] text-zinc-400">
+              Todos os registos (Voluntariado, Instrução, Gratificações, Tarefas e Perfil) são guardados de forma persistente e em tempo real.
+            </p>
           </div>
 
           {/* Inputs */}
@@ -213,7 +213,7 @@ export const SupabaseConnectModal: React.FC<SupabaseConnectModalProps> = ({
             <div>
               <label className="block text-xs font-bold text-zinc-200 mb-1.5 flex items-center justify-between">
                 <span>Project URL (Supabase URL) <span className="text-red-400">*</span></span>
-                <span className="text-[10px] text-zinc-500 font-mono">https://xyz.supabase.co</span>
+                <span className="text-[10px] text-zinc-500 font-mono">https://{SUPABASE_PROJECT_ID}.supabase.co</span>
               </label>
               <input
                 type="url"
@@ -227,13 +227,13 @@ export const SupabaseConnectModal: React.FC<SupabaseConnectModalProps> = ({
 
             <div>
               <label className="block text-xs font-bold text-zinc-200 mb-1.5 flex items-center justify-between">
-                <span>API Anon Key (Chave Pública) <span className="text-red-400">*</span></span>
-                <span className="text-[10px] text-zinc-500 font-mono">eyJh...</span>
+                <span>API Anon / Public Key <span className="text-red-400">*</span></span>
+                <span className="text-[10px] text-zinc-500 font-mono">sb_publishable_...</span>
               </label>
               <input
                 type="password"
                 required
-                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                placeholder="sb_publishable_..."
                 value={supabaseKey}
                 onChange={(e) => setSupabaseKey(e.target.value)}
                 className="w-full px-4 py-2.5 bg-[#161220] border border-[#282038] rounded-xl text-white text-xs font-mono outline-none focus:ring-2 focus:ring-emerald-500 placeholder-zinc-600"
@@ -267,7 +267,7 @@ export const SupabaseConnectModal: React.FC<SupabaseConnectModalProps> = ({
               ) : (
                 <>
                   <ShieldCheck className="w-4 h-4" />
-                  <span>{isConnected ? 'Guardar & Reconectar' : 'Conectar Base de Dados'}</span>
+                  <span>{isConnected ? 'Guardar & Testar' : 'Conectar Base de Dados'}</span>
                   <ArrowRight className="w-4 h-4 ml-1" />
                 </>
               )}

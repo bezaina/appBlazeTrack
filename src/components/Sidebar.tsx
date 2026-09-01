@@ -18,9 +18,12 @@ import {
   CheckCircle2,
   KeyRound,
   Users,
-  LogOut
+  LogOut,
+  Database,
+  RefreshCw
 } from 'lucide-react';
 import { ActiveTab, UserProfile, ActiveShiftTimer } from '../types';
+import { isSupabaseConfigured, SUPABASE_PROJECT_NAME } from '../services/supabase';
 
 interface SidebarProps {
   activeTab: ActiveTab;
@@ -30,6 +33,9 @@ interface SidebarProps {
   onOpenQuickAdd: () => void;
   onOpenGoogleAuth: () => void;
   onOpenAuthModal?: () => void;
+  onOpenSupabaseConnect?: () => void;
+  onSyncSupabase?: () => void;
+  isSyncingSupabase?: boolean;
   onLockApp: () => void;
   onLogout?: () => void;
   shiftDurationStr: string;
@@ -43,11 +49,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenQuickAdd,
   onOpenGoogleAuth,
   onOpenAuthModal,
+  onOpenSupabaseConnect,
+  onSyncSupabase,
+  isSyncingSupabase,
   onLockApp,
   onLogout,
   shiftDurationStr,
 }) => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const isSupabaseActive = isSupabaseConfigured();
 
   const mainNavItems = [
     { id: 'dashboard' as ActiveTab, label: 'Início', icon: Home },
@@ -280,6 +290,44 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
 
             <KeyRound className="w-3.5 h-3.5 text-zinc-400 group-hover:text-orange-400 transition-colors shrink-0" />
+          </div>
+
+          {/* Supabase Cloud Connection & Sync Status Card */}
+          <div className="p-2.5 bg-[#12161A] border border-[#1E2E38] rounded-xl flex items-center justify-between shadow-xs">
+            <button
+              type="button"
+              onClick={() => {
+                if (onOpenSupabaseConnect) onOpenSupabaseConnect();
+                setIsMobileOpen(false);
+              }}
+              className="flex items-center space-x-2 min-w-0 text-left cursor-pointer group"
+              title="Base de dados Supabase (jagamaal@gmail.com's Project)"
+            >
+              <div className="w-6 h-6 rounded-lg bg-emerald-950 border border-emerald-600/40 flex items-center justify-center text-emerald-400 shrink-0">
+                <Database className="w-3.5 h-3.5" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center space-x-1.5">
+                  <span className="text-[11px] font-bold text-emerald-300 truncate">Supabase DB</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                </div>
+                <span className="text-[9px] text-zinc-400 font-mono truncate block">
+                  jagamaal@gmail.com
+                </span>
+              </div>
+            </button>
+
+            {onSyncSupabase && (
+              <button
+                type="button"
+                onClick={onSyncSupabase}
+                disabled={isSyncingSupabase}
+                className="p-1.5 text-zinc-400 hover:text-emerald-300 hover:bg-emerald-950/40 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                title="Sincronizar todos os registos agora com Supabase"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncingSupabase ? 'animate-spin text-emerald-400' : ''}`} />
+              </button>
+            )}
           </div>
 
           <button

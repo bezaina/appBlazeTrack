@@ -117,6 +117,9 @@ export interface FirefighterAccount {
   monthlyTargetHours?: number;
   avatarUrl?: string;
   role?: 'bombeiro' | 'graduado' | 'oficial' | 'comando' | 'admin';
+  isEmailConfirmed?: boolean; // Requer confirmação por email ao registar
+  confirmationCode?: string; // Código de ativação de 6 dígitos
+  confirmationToken?: string; // Token de link de ativação
   createdAt: string;
   lastLoginAt?: string;
 }
@@ -134,6 +137,7 @@ export interface UserProfile {
   pinHash?: string; // 4-digit PIN stored
   theme: 'light' | 'dark' | 'system';
   showReminder: boolean;
+  isEmailConfirmed?: boolean;
   // Google Authentication
   googleUser?: GoogleUserAccount | null;
   // Gratification rate definitions

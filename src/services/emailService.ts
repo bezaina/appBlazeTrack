@@ -587,3 +587,155 @@ export async function sendReportEmail(
     };
   }
 }
+
+/* =========================================================================
+   SMTP & SUPABASE EMAIL CONFIGURATION & DIAGNOSTICS HELPERS
+   ========================================================================= */
+
+export interface SmtpConfig {
+  host: string;
+  port: number;
+  secure?: boolean;
+  user: string;
+  pass: string;
+  from: string;
+  senderName?: string;
+  provider?: 'custom' | 'supabase_smtp' | 'resend' | 'sendgrid' | 'brevo' | 'gmail' | 'mailgun' | 'ses';
+}
+
+export interface SmtpTestResult {
+  success: boolean;
+  message: string;
+  latencyMs?: number;
+  messageId?: string;
+  isLiveSmtp?: boolean;
+  destinationEmail?: string;
+  logs?: string[];
+  error?: string;
+}
+
+export interface ServerEmailStatus {
+  isConfigured: boolean;
+  host: string | null;
+  rawHost?: string | null;
+  port: number;
+  user: string | null;
+  from: string;
+  secure: boolean;
+  timestamp?: string;
+}
+
+const LOCAL_SMTP_CONFIG_KEY = 'bv_custom_smtp_settings';
+
+/**
+ * Retrieves saved custom SMTP settings from local storage
+ */
+export function getSavedSmtpConfig(): SmtpConfig | null {
+  try {
+    const raw = localStorage.getItem(LOCAL_SMTP_CONFIG_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Saves custom SMTP settings to local storage
+ */
+export function saveSmtpConfig(config: SmtpConfig): void {
+  try {
+    localStorage.setItem(LOCAL_SMTP_CONFIG_KEY, JSON.stringify(config));
+  } catch (e) {
+    console.warn('Could not save SMTP config to localStorage:', e);
+  }
+}
+
+/**
+ * Fetches current backend SMTP server status
+ */
+export async function getServerEmailStatus(): Promise<ServerEmailStatus> {
+  try {
+    const res = await fetch('/api/email/status');
+    if (!res.ok) throw new Error('Status endpoint failed');
+    return await res.json();
+  } catch {
+    return {
+      isConfigured: false,
+      host: null,
+      port: 587,
+      user: null,
+      from: 'noreply@blazetrack.bv.pt',
+      secure: false,
+    };
+  }
+}
+
+/**
+ * Tests direct SMTP connection and optionally sends a verification test email
+ */
+export async function testSmtpConnection(
+  config: Partial<SmtpConfig>,
+  testRecipient?: string,
+  saveAsActive: boolean = false
+): Promise<SmtpTestResult> {
+  try {
+    const res = await fetch('/api/email/test-smtp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        host: config.host,
+        port: config.port,
+        secure: config.secure,
+        user: config.user,
+        pass: config.pass,
+        from: config.from,
+        to: testRecipient,
+        testType: 'handshake_and_email',
+        saveConfig: saveAsActive,
+      }),
+    });
+
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    return {
+      success: false,
+      message: 'Falha na comunicação com o servidor de teste SMTP.',
+      error: err.message || 'Erro de rede.',
+      logs: [`[Erro de Rede] ${err.message}`],
+    };
+  }
+}
+
+/**
+ * Sends a real PIN Recovery Code email via backend API
+ */
+export async function sendPinRecoveryEmail(
+  toEmail: string,
+  code: string,
+  firefighterName: string,
+  firefighterNumber?: string
+): Promise<{ success: boolean; message: string; messageId?: string }> {
+  try {
+    const res = await fetch('/api/email/send-pin-recovery', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: toEmail,
+        code,
+        firefighterName,
+        firefighterNumber,
+      }),
+    });
+
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err.message || 'Erro ao enviar email de recuperação de PIN.',
+    };
+  }
+}
+
