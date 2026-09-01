@@ -1,0 +1,280 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  X, 
+  Database, 
+  CheckCircle2, 
+  AlertCircle, 
+  Loader2, 
+  ExternalLink, 
+  ShieldCheck, 
+  ArrowRight,
+  Sparkles,
+  Unplug
+} from 'lucide-react';
+import { 
+  getSupabaseConfig, 
+  setCustomSupabaseConfig, 
+  disconnectSupabase, 
+  isSupabaseConfigured,
+  getSupabase 
+} from '../services/supabase';
+
+interface SupabaseConnectModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConnectionChanged?: (isConnected: boolean) => void;
+}
+
+export const SupabaseConnectModal: React.FC<SupabaseConnectModalProps> = ({
+  isOpen,
+  onClose,
+  onConnectionChanged,
+}) => {
+  const [supabaseUrl, setSupabaseUrl] = useState('');
+  const [supabaseKey, setSupabaseKey] = useState('');
+  const [isTesting, setIsTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      const config = getSupabaseConfig();
+      setSupabaseUrl(config.url);
+      setSupabaseKey(config.key);
+      setIsConnected(isSupabaseConfigured());
+      setTestResult(null);
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const handleTestAndSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanUrl = supabaseUrl.trim();
+    const cleanKey = supabaseKey.trim();
+
+    if (!cleanUrl || !cleanKey) {
+      setTestResult({
+        success: false,
+        message: 'Por favor preencha o Project URL e a Chave anon/public do Supabase.',
+      });
+      return;
+    }
+
+    if (!cleanUrl.startsWith('https://')) {
+      setTestResult({
+        success: false,
+        message: 'O Project URL deve começar por https:// (ex: https://xyzcompany.supabase.co)',
+      });
+      return;
+    }
+
+    setIsTesting(true);
+    setTestResult(null);
+
+    try {
+      setCustomSupabaseConfig(cleanUrl, cleanKey);
+      const client = getSupabase();
+      
+      if (!client) {
+        throw new Error('Não foi possível inicializar o cliente Supabase.');
+      }
+
+      const { error } = await client
+        .from('user_profiles')
+        .select('id')
+        .limit(1);
+
+      if (error && error.code !== 'PGRST116') {
+        if (error.message.includes('relation') || error.message.includes('does not exist')) {
+          setTestResult({
+            success: true,
+            message: 'Ligado com sucesso ao Supabase! Lembre-se de executar as tabelas no SQL Editor.',
+          });
+        } else {
+          throw new Error(error.message || 'Falha na resposta do Supabase.');
+        }
+      } else {
+        setTestResult({
+          success: true,
+          message: 'Base de dados Supabase conectada e sincronizada com sucesso!',
+        });
+      }
+
+      setIsConnected(true);
+      if (onConnectionChanged) onConnectionChanged(true);
+      
+      setTimeout(() => {
+        onClose();
+      }, 1200);
+    } catch (err: any) {
+      setTestResult({
+        success: false,
+        message: err.message || 'Erro ao ligar ao Supabase. Verifique o URL e a chave anon.',
+      });
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  const handleDisconnect = () => {
+    disconnectSupabase();
+    setSupabaseUrl('');
+    setSupabaseKey('');
+    setIsConnected(false);
+    setTestResult({
+      success: false,
+      message: 'Base de dados desconectada. A aplicação utilizará o armazenamento local.',
+    });
+    if (onConnectionChanged) onConnectionChanged(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="relative w-full max-w-lg bg-[#111015] border border-[#272138] rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+        {/* Header */}
+        <div className="px-6 pt-6 pb-4 border-b border-[#201A2C] flex items-center justify-between bg-gradient-to-r from-[#171322] to-[#120F1C]">
+          <div className="flex items-center space-x-3">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white shadow-lg shadow-emerald-950/60 border border-emerald-500/30 shrink-0">
+              <Database className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <h3 className="text-lg font-black text-white tracking-tight">
+                  Conectar Base de Dados
+                </h3>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider font-mono border ${
+                  isConnected 
+                    ? 'bg-emerald-950/80 border-emerald-700 text-emerald-400' 
+                    : 'bg-amber-950/80 border-amber-800 text-amber-300'
+                }`}>
+                  {isConnected ? 'Conectada' : 'Não Conectada'}
+                </span>
+              </div>
+              <p className="text-xs text-zinc-400">
+                Integração direta com Supabase PostgreSQL para persistência na nuvem
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-[#1E1928] transition-colors cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Form Body */}
+        <form onSubmit={handleTestAndSave} className="p-6 overflow-y-auto space-y-4 flex-1">
+          {/* Status Message */}
+          {testResult && (
+            <div className={`p-3.5 rounded-2xl text-xs flex items-center space-x-2.5 shadow-md border ${
+              testResult.success 
+                ? 'bg-emerald-950/80 border-emerald-700/80 text-emerald-200' 
+                : 'bg-red-950/80 border-red-800/80 text-red-200'
+            }`}>
+              {testResult.success ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+              ) : (
+                <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
+              )}
+              <span className="font-medium">{testResult.message}</span>
+            </div>
+          )}
+
+          {/* Quick Guide Card */}
+          <div className="p-3.5 bg-[#171322] border border-[#2B223E] rounded-2xl space-y-2 text-xs">
+            <div className="flex items-center justify-between text-zinc-200 font-bold">
+              <span className="flex items-center space-x-1.5 text-emerald-400">
+                <Sparkles className="w-4 h-4" />
+                <span>Onde encontrar as credenciais no Supabase?</span>
+              </span>
+              <a
+                href="https://supabase.com/dashboard"
+                target="_blank"
+                rel="noreferrer"
+                className="text-[11px] text-zinc-400 hover:text-white flex items-center space-x-1 underline"
+              >
+                <span>Abrir Supabase</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+            <ol className="list-decimal list-inside text-zinc-400 space-y-1 text-[11px]">
+              <li>Aceda ao seu projeto em <strong className="text-zinc-300">supabase.com</strong></li>
+              <li>Vá a <strong className="text-zinc-300">Project Settings → API</strong></li>
+              <li>Copie o <strong className="text-zinc-300">Project URL</strong> e a <strong className="text-zinc-300">anon / public key</strong></li>
+            </ol>
+          </div>
+
+          {/* Inputs */}
+          <div className="space-y-3.5">
+            <div>
+              <label className="block text-xs font-bold text-zinc-200 mb-1.5 flex items-center justify-between">
+                <span>Project URL (Supabase URL) <span className="text-red-400">*</span></span>
+                <span className="text-[10px] text-zinc-500 font-mono">https://xyz.supabase.co</span>
+              </label>
+              <input
+                type="url"
+                required
+                placeholder="https://seu-projeto.supabase.co"
+                value={supabaseUrl}
+                onChange={(e) => setSupabaseUrl(e.target.value)}
+                className="w-full px-4 py-2.5 bg-[#161220] border border-[#282038] rounded-xl text-white text-xs font-mono outline-none focus:ring-2 focus:ring-emerald-500 placeholder-zinc-600"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-zinc-200 mb-1.5 flex items-center justify-between">
+                <span>API Anon Key (Chave Pública) <span className="text-red-400">*</span></span>
+                <span className="text-[10px] text-zinc-500 font-mono">eyJh...</span>
+              </label>
+              <input
+                type="password"
+                required
+                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                value={supabaseKey}
+                onChange={(e) => setSupabaseKey(e.target.value)}
+                className="w-full px-4 py-2.5 bg-[#161220] border border-[#282038] rounded-xl text-white text-xs font-mono outline-none focus:ring-2 focus:ring-emerald-500 placeholder-zinc-600"
+              />
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="pt-2 flex items-center space-x-3">
+            {isConnected && (
+              <button
+                type="button"
+                onClick={handleDisconnect}
+                className="py-3 px-4 bg-red-950/50 hover:bg-red-900/60 border border-red-800/60 text-red-300 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-1.5 shrink-0"
+              >
+                <Unplug className="w-4 h-4" />
+                <span>Desconectar</span>
+              </button>
+            )}
+
+            <button
+              type="submit"
+              disabled={isTesting}
+              className="flex-1 py-3 px-4 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-600 text-white font-bold text-xs sm:text-sm rounded-xl shadow-lg shadow-emerald-950/60 flex items-center justify-center space-x-2 transition-all cursor-pointer disabled:opacity-50"
+            >
+              {isTesting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>A testar ligação...</span>
+                </>
+              ) : (
+                <>
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>{isConnected ? 'Guardar & Reconectar' : 'Conectar Base de Dados'}</span>
+                  <ArrowRight className="w-4 h-4 ml-1" />
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};

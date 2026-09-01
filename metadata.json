@@ -1,0 +1,6 @@
+{
+  "name": "BLAZETRACK - Registo de Bombeiro Voluntário",
+  "description": "Gestão completa de horas de voluntariado, horas de instrução, gratificações, metas anuais e relatórios operacionais para bombeiros voluntários.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
