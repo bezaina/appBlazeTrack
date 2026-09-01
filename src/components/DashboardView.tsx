@@ -25,6 +25,7 @@ import {
   MONTH_NAMES_PT, 
   MONTH_SHORT_PT 
 } from '../utils/formatters';
+import { BlazeTrackLogo } from './BlazeTrackLogo';
 
 interface DashboardViewProps {
   volunteerRecords: VolunteerServiceRecord[];
@@ -242,13 +243,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <div className="relative z-10 max-w-4xl mx-auto space-y-8 sm:space-y-10 pt-2 sm:pt-4">
         
         {/* Top Centered Brand Header */}
-        <div className="text-center space-y-1 pt-2 sm:pt-4">
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black uppercase tracking-wider font-sans bg-clip-text text-transparent bg-gradient-to-b from-amber-300 via-orange-500 to-amber-600 drop-shadow-[0_4px_24px_rgba(234,88,12,0.45)]">
-            BLAZETRACK
-          </h1>
-          <p className="text-xs sm:text-sm font-bold tracking-[0.3em] text-amber-200/70 uppercase">
-            BOMBEIRO VOLUNTÁRIO
-          </p>
+        <div className="flex flex-col items-center justify-center text-center space-y-2 pt-2 sm:pt-4">
+          <BlazeTrackLogo variant="emblem" size="lg" className="hover:scale-105 transition-transform drop-shadow-[0_8px_24px_rgba(239,68,68,0.3)]" />
+          <div>
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black uppercase tracking-wider font-sans bg-clip-text text-transparent bg-gradient-to-b from-amber-300 via-orange-500 to-amber-600 drop-shadow-[0_4px_24px_rgba(234,88,12,0.45)]">
+              BLAZETRACK
+            </h1>
+            <p className="text-xs sm:text-sm font-bold tracking-[0.3em] text-amber-200/70 uppercase">
+              GESTÃO OPERACIONAL • BOMBEIRO VOLUNTÁRIO
+            </p>
+          </div>
         </div>
 
         {/* Annual Mandatory Goals Gauges Section ("METAS ANUAIS OBRIGATÓRIAS") */}

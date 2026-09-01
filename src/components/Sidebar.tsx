@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { ActiveTab, UserProfile, ActiveShiftTimer } from '../types';
 import { isSupabaseConfigured, SUPABASE_PROJECT_NAME } from '../services/supabase';
+import { BlazeTrackLogo } from './BlazeTrackLogo';
 
 interface SidebarProps {
   activeTab: ActiveTab;
@@ -83,14 +84,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onClick={() => handleNavClick('dashboard')}
           className="flex items-center space-x-2.5 cursor-pointer"
         >
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-md shadow-orange-950/50">
-            <Flame className="w-4 h-4 text-white fill-white" />
-          </div>
-          <div>
-            <span className="font-black text-base sm:text-lg tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-orange-400 to-amber-300">
-              BLAZETRACK
-            </span>
-          </div>
+          <BlazeTrackLogo variant="horizontal" size="sm" subtitle="GESTÃO OPERACIONAL" />
         </div>
 
         <div className="flex items-center space-x-2">
@@ -146,18 +140,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="space-y-5">
           {/* Brand Logo & Close for Mobile */}
           <div className="flex items-center justify-between px-2 pt-2">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-orange-500 via-amber-500 to-red-600 p-0.5 shadow-lg shadow-orange-950/60 flex items-center justify-center">
-                <div className="w-full h-full bg-[#110D16] rounded-[14px] flex items-center justify-center">
-                  <Flame className="w-5 h-5 text-orange-500 fill-orange-500" />
-                </div>
-              </div>
+            <div 
+              onClick={() => handleNavClick('dashboard')}
+              className="flex items-center space-x-3 cursor-pointer"
+            >
+              <BlazeTrackLogo variant="emblem" size="md" />
               <div>
-                <span className="font-black text-xl tracking-wider text-orange-500 block leading-tight font-sans">
+                <span className="font-black text-xl tracking-wider text-white block leading-tight font-sans">
                   BLAZETRACK
                 </span>
-                <span className="text-[10px] uppercase font-bold tracking-widest text-zinc-500">
-                  {profile.rank || 'Bombeiro Voluntário'}
+                <span className="text-[9px] uppercase font-bold tracking-widest text-orange-400 block">
+                  {profile.rank || 'Gestão Operacional'}
                 </span>
               </div>
             </div>

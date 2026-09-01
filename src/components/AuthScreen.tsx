@@ -23,6 +23,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { UserProfile } from '../types';
+import { BlazeTrackLogo } from './BlazeTrackLogo';
 import { 
   loginWithEmailPassword, 
   registerWithEmailPassword, 
@@ -265,17 +266,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthenticated }) => {
       <div className="w-full max-w-md z-10 space-y-6">
         {/* Brand Header */}
         <div className="text-center space-y-3">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-3xl bg-gradient-to-br from-red-600 via-orange-600 to-amber-600 shadow-xl shadow-red-950/80 border border-red-500/30">
-            <Flame className="w-9 h-9 text-white animate-pulse" />
-          </div>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-              Portal do Bombeiro
-            </h1>
-            <p className="text-xs sm:text-sm text-zinc-400 mt-1 max-w-xs mx-auto">
-              Registo de Horas de Voluntariado, Instrução e Gratificações
-            </p>
-          </div>
+          <BlazeTrackLogo variant="full" size="lg" subtitle="GESTÃO OPERACIONAL" />
+          <p className="text-xs text-zinc-400 max-w-xs mx-auto">
+            Registo de Horas de Voluntariado, Instrução e Gratificações
+          </p>
         </div>
 
         {/* Auth Card */}
