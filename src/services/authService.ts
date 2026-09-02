@@ -12,57 +12,50 @@ import { signOutGoogle } from './googleAuth';
 const ACCOUNTS_STORAGE_KEY = 'bv_firefighter_accounts_v2';
 const ACTIVE_ACCOUNT_ID_KEY = 'bv_active_account_id_v2';
 
-// Default initial pre-configured accounts (No PIN by default per user specification)
-export const DEFAULT_ACCOUNTS: FirefighterAccount[] = [
-  {
-    id: 'bv-acc-1428',
-    firefighterNumber: '1428',
-    username: 'goncalo.silva',
-    name: 'Gonçalo M. Silva',
-    corpsName: 'Bombeiros Voluntários de Sintra',
-    rank: 'Bombeiro de 2ª Classe',
-    pinCode: '',
-    password: 'password123',
-    email: 'JAGAMAAL@gmail.com',
-    monthlyTargetHours: 35,
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
-    role: 'bombeiro',
-    createdAt: '2026-01-15T08:00:00Z',
-    lastLoginAt: new Date().toISOString(),
-  },
-  {
-    id: 'bv-acc-2105',
-    firefighterNumber: '2105',
-    username: 'chefe.rodrigues',
-    name: 'Carlos Rodrigues',
-    corpsName: 'Bombeiros Voluntários de Lisboa',
-    rank: 'Chefe de Serviço',
-    pinCode: '',
-    password: 'chefe2026',
-    email: 'carlos.rodrigues@bv.pt',
-    monthlyTargetHours: 40,
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80',
-    role: 'graduado',
-    createdAt: '2026-02-10T10:00:00Z',
-    lastLoginAt: '2026-08-29T14:30:00Z',
-  },
-  {
-    id: 'bv-acc-3310',
-    firefighterNumber: '3310',
-    username: 'ana.martins',
-    name: 'Ana Filipa Martins',
-    corpsName: 'Bombeiros Voluntários de Coimbra',
-    rank: 'Bombeiro de 1ª Classe',
-    pinCode: '',
-    password: 'bombeira2026',
-    email: 'ana.martins@bv.pt',
-    monthlyTargetHours: 35,
-    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=120&auto=format&fit=crop&q=80',
-    role: 'bombeiro',
-    createdAt: '2026-03-01T09:00:00Z',
-    lastLoginAt: '2026-08-28T18:00:00Z',
+// All existing mock accounts deleted per user requirement
+export const DEFAULT_ACCOUNTS: FirefighterAccount[] = [];
+
+// Automatic one-time cleanup of legacy mock accounts from localStorage
+(function purgeLegacyMockAccounts() {
+  try {
+    const raw = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
+    if (raw) {
+      const parsed: FirefighterAccount[] = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const filtered = parsed.filter(
+          (a) => !['bv-acc-1428', 'bv-acc-2105', 'bv-acc-3310'].includes(a.id) &&
+                 !['Gonçalo M. Silva', 'Carlos Rodrigues', 'Ana Filipa Martins'].includes(a.name)
+        );
+        if (filtered.length !== parsed.length) {
+          localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(filtered));
+        }
+      }
+    }
+
+    // Check active account
+    const activeId = localStorage.getItem(ACTIVE_ACCOUNT_ID_KEY);
+    if (activeId && ['bv-acc-1428', 'bv-acc-2105', 'bv-acc-3310'].includes(activeId)) {
+      localStorage.removeItem(ACTIVE_ACCOUNT_ID_KEY);
+    }
+  } catch (e) {
+    console.warn('Error purging legacy accounts:', e);
   }
-];
+})();
+
+/**
+ * Clears all accounts and active user sessions from local storage
+ */
+export function clearAllAccounts(): void {
+  try {
+    localStorage.removeItem(ACCOUNTS_STORAGE_KEY);
+    localStorage.removeItem(ACTIVE_ACCOUNT_ID_KEY);
+    localStorage.removeItem('bv_profile_v1');
+    localStorage.removeItem('bv_google_access_token_v1');
+    localStorage.removeItem('bv_pin_locked_state');
+  } catch (err) {
+    console.error('Error clearing accounts:', err);
+  }
+}
 
 /**
  * Loads all saved firefighter accounts from LocalStorage and synchronizes with Supabase
@@ -72,16 +65,18 @@ export function getSavedAccounts(): FirefighterAccount[] {
     const raw = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
     if (raw) {
       const parsed: FirefighterAccount[] = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+      if (Array.isArray(parsed)) {
+        // Filter out legacy mock accounts
+        return parsed.filter(
+          (a) => !['bv-acc-1428', 'bv-acc-2105', 'bv-acc-3310'].includes(a.id) &&
+                 !['Gonçalo M. Silva', 'Carlos Rodrigues', 'Ana Filipa Martins'].includes(a.name)
+        );
       }
     }
   } catch (err) {
     console.error('Error loading saved accounts:', err);
   }
-  // Initialize with defaults if empty
-  saveAccounts(DEFAULT_ACCOUNTS);
-  return DEFAULT_ACCOUNTS;
+  return [];
 }
 
 /**

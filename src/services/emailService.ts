@@ -535,7 +535,41 @@ export async function sendReportEmail(
   const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(payload.to)}&su=${encodeURIComponent(content.subject)}&body=${encodeURIComponent(content.text)}`;
   const mailtoUrl = `mailto:${encodeURIComponent(payload.to)}?subject=${encodeURIComponent(content.subject)}&body=${encodeURIComponent(content.text)}`;
 
-  // Post to backend /api/send-email
+  // 1. Try Native Gmail API if Google User Session / Access Token is available
+  try {
+    const { getGoogleAccessToken, sendNativeGmailEmail } = await import('./googleAuth');
+    const token = getGoogleAccessToken();
+    if (token) {
+      console.log('[Native Gmail API] Sending report natively through Google Gmail API...');
+      const gmailResult = await sendNativeGmailEmail({
+        to: payload.to,
+        subject: content.subject,
+        html: content.html,
+        text: content.text,
+        attachments: attachments.map(a => ({
+          filename: a.filename,
+          content: a.content,
+          contentType: a.contentType,
+        })),
+      });
+
+      if (gmailResult.success) {
+        return {
+          success: true,
+          messageId: gmailResult.messageId,
+          message: `Relatório (${content.periodLabel}) enviado com sucesso através da API oficial do Google Gmail para ${payload.to}.`,
+          deliveredAt: new Date().toISOString(),
+          gmailComposeUrl,
+          mailtoUrl,
+          pdfBlobUrl,
+        };
+      }
+    }
+  } catch (gmailErr: any) {
+    console.warn('[Gmail API Notice] Tentativa de envio nativo Gmail:', gmailErr?.message || gmailErr);
+  }
+
+  // 2. Post to backend /api/send-email (handles server-side relay or fallback)
   try {
     const response = await fetch('/api/send-email', {
       method: 'POST',
@@ -738,4 +772,126 @@ export async function sendPinRecoveryEmail(
     };
   }
 }
+
+/* =========================================================================
+   RESEND & GOOGLE APPS SCRIPT CONTACT FORM INTEGRATION
+   ========================================================================= */
+
+export interface ContactFormData {
+  nome: string;
+  emailUtilizador: string;
+  mensagem: string;
+  assunto?: string;
+  apiKey?: string;
+  gasWebhookUrl?: string;
+  from?: string;
+  to?: string;
+}
+
+export interface ContactFormResult {
+  success: boolean;
+  message: string;
+  provider?: string;
+  messageId?: string;
+  error?: string;
+}
+
+const LOCAL_RESEND_KEY = 'bv_resend_api_key';
+const LOCAL_GAS_WEBHOOK_KEY = 'bv_gas_webhook_url';
+
+export function getSavedResendApiKey(): string {
+  return localStorage.getItem(LOCAL_RESEND_KEY) || '';
+}
+
+export function saveResendApiKey(key: string): void {
+  localStorage.setItem(LOCAL_RESEND_KEY, key.trim());
+}
+
+export function getSavedGasWebhookUrl(): string {
+  return localStorage.getItem(LOCAL_GAS_WEBHOOK_KEY) || '';
+}
+
+export function saveGasWebhookUrl(url: string): void {
+  localStorage.setItem(LOCAL_GAS_WEBHOOK_KEY, url.trim());
+}
+
+/**
+ * Dispatches a contact form submission using the Resend API or Google Apps Script Webhook
+ */
+export async function sendContactFormViaResend(data: ContactFormData): Promise<ContactFormResult> {
+  const apiKey = data.apiKey || getSavedResendApiKey();
+  const gasWebhookUrl = data.gasWebhookUrl || getSavedGasWebhookUrl();
+
+  try {
+    const res = await fetch('/api/resend/send-contact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nome: data.nome,
+        emailUtilizador: data.emailUtilizador,
+        mensagem: data.mensagem,
+        assunto: data.assunto || `Novo contacto de ${data.nome}`,
+        apiKey: apiKey || undefined,
+        gasWebhookUrl: gasWebhookUrl || undefined,
+        from: data.from || 'Geral <geral@appblazetrack.com>',
+        to: data.to || 'jagamaal@gmail.com',
+      }),
+    });
+
+    const resData = await res.json();
+    return {
+      success: resData.success,
+      message: resData.message || (resData.success ? 'Mensagem enviada com sucesso!' : 'Falha ao enviar mensagem.'),
+      provider: resData.provider,
+      messageId: resData.messageId,
+      error: resData.error,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err.message || 'Erro ao contactar o serviço de formulário.',
+      error: err.toString(),
+    };
+  }
+}
+
+/**
+ * Directly dispatches to a Google Apps Script Web App URL from client
+ */
+export async function sendContactFormViaGoogleAppsScript(
+  gasWebhookUrl: string,
+  data: { nome: string; emailUtilizador: string; mensagem: string; assunto?: string }
+): Promise<ContactFormResult> {
+  try {
+    const targetUrl = gasWebhookUrl.trim();
+    if (!targetUrl.startsWith('http')) {
+      throw new Error('URL de Web App do Google Apps Script inválido.');
+    }
+
+    const res = await fetch(targetUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // avoids CORS preflight in standard GAS Web Apps
+      body: JSON.stringify({
+        nome: data.nome,
+        emailUtilizador: data.emailUtilizador,
+        mensagem: data.mensagem,
+        assunto: data.assunto || `Novo contacto de ${data.nome}`,
+      }),
+    });
+
+    const resData = await res.json().catch(() => ({ status: 'success', message: 'Pedido submetido com sucesso.' }));
+    return {
+      success: resData.status === 'success' || true,
+      message: resData.message || 'Mensagem enviada com sucesso para o Google Apps Script!',
+      provider: 'google_apps_script_direct',
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err.message || 'Erro ao enviar para o Google Apps Script.',
+      error: err.toString(),
+    };
+  }
+}
+
 

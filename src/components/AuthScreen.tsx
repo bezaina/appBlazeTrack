@@ -1,336 +1,115 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
-  Flame, 
-  Mail, 
-  Lock, 
-  User, 
-  Eye, 
-  EyeOff, 
-  ArrowRight, 
   Loader2, 
   CheckCircle2, 
   AlertCircle, 
   ShieldCheck, 
-  Sparkles,
-  Clock,
-  Award,
-  BookOpen,
-  KeyRound,
-  ArrowLeft,
-  Send,
-  ExternalLink,
-  MailCheck,
-  RefreshCw
+  Clock, 
+  Award, 
+  BookOpen, 
+  ArrowRight, 
+  ChevronRight 
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { BlazeTrackLogo } from './BlazeTrackLogo';
-import { 
-  loginWithEmailPassword, 
-  registerWithEmailPassword, 
-  accountToProfile,
-  sendPasswordResetEmail,
-  resetAccountPassword,
-  confirmAccountEmail,
-  resendConfirmationEmail
-} from '../services/authService';
+import { signInWithGoogleAccount } from '../services/googleAuth';
+import { loginWithGoogle, getSavedAccounts, accountToProfile } from '../services/authService';
 
 interface AuthScreenProps {
   onAuthenticated: (profile: UserProfile) => void;
 }
 
-type AuthMode = 'login' | 'signup' | 'confirm-email' | 'forgot-password';
-
 export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthenticated }) => {
-  const [mode, setMode] = useState<AuthMode>('login');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-
-  // Email Confirmation states
-  const [confirmationCode, setConfirmationCode] = useState('');
-  const [isResendingCode, setIsResendingCode] = useState(false);
-
-  // Forgot password / Recovery states
-  const [resetStep, setResetStep] = useState<'request' | 'verify'>('request');
-  const [resetCode, setResetCode] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [sentToEmail, setSentToEmail] = useState('');
-
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Check if URL has reset token or verify email parameter
-  useEffect(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const resetToken = params.get('reset_token');
-      const resetEmail = params.get('email');
-      const verifyEmail = params.get('verify_email');
-      const verifyCode = params.get('code');
+  // Saved accounts for 1-click firefighter switch
+  const savedAccounts = getSavedAccounts();
 
-      if (verifyEmail) {
-        setMode('confirm-email');
-        setSentToEmail(verifyEmail);
-        setEmail(verifyEmail);
-        if (verifyCode) {
-          setConfirmationCode(verifyCode.replace(/\D/g, '').substring(0, 6));
-        }
-      } else if (resetToken) {
-        setMode('forgot-password');
-        setResetStep('verify');
-        setResetCode(resetToken);
-        if (resetEmail) {
-          setEmail(resetEmail);
-          setSentToEmail(resetEmail);
-        }
-      }
-    } catch {}
-  }, []);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGoogleSignIn = async () => {
     setIsLoading(true);
     setErrorMessage(null);
     setSuccessMessage(null);
 
     try {
-      if (mode === 'login') {
-        const res = await loginWithEmailPassword(email, password);
-        if (res.success && res.account) {
-          const profile = accountToProfile(res.account);
-          setSuccessMessage(`Sessão iniciada com sucesso! A carregar os seus dados...`);
-          setTimeout(() => {
-            onAuthenticated(profile);
-          }, 800);
-        } else if (res.needsEmailConfirmation) {
-          setSentToEmail(res.email || email);
-          setMode('confirm-email');
-          setErrorMessage(res.error || 'Por favor valide o seu email antes de iniciar sessão.');
-        } else {
-          setErrorMessage(res.error || 'Email ou palavra-passe incorretos.');
-        }
-      } else if (mode === 'signup') {
-        const res = await registerWithEmailPassword({
-          email,
-          password,
-          name: name || undefined,
-        });
-
-        if (res.success && res.account) {
-          setSentToEmail(email.trim().toLowerCase());
-          setMode('confirm-email');
-          setSuccessMessage(
-            `Conta criada com sucesso! Enviámos um código de ativação de 6 dígitos para ${email}. Introduza o código abaixo para ter acesso à app.`
-          );
-        } else {
-          setErrorMessage(res.error || 'Erro ao criar conta. Tente novamente.');
-        }
-      }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Ocorreu um erro ao processar o pedido.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleConfirmCodeSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const targetEmail = sentToEmail || email;
-    if (!targetEmail) {
-      setErrorMessage('Endereço de email não especificado.');
-      return;
-    }
-    if (!confirmationCode || confirmationCode.trim().length < 6) {
-      setErrorMessage('Por favor introduza o código de confirmação de 6 dígitos.');
-      return;
-    }
-
-    setIsLoading(true);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-
-    try {
-      const res = await confirmAccountEmail(targetEmail, confirmationCode.trim());
-      if (res.success && res.account) {
-        const profile = accountToProfile(res.account);
-        setSuccessMessage(`Email confirmado e conta ativada com sucesso! Bem-vindo(a), ${res.account.name}.`);
+      const { account: googleUser } = await signInWithGoogleAccount();
+      const loginRes = await loginWithGoogle(googleUser);
+      
+      if (loginRes.success && loginRes.account) {
+        const profile = accountToProfile(loginRes.account);
+        // Ensure googleUser is preserved in profile
+        profile.googleUser = googleUser;
+        
+        setSuccessMessage(`Bem-vindo(a), ${googleUser.name}! Sessão iniciada com sucesso.`);
         setTimeout(() => {
           onAuthenticated(profile);
-        }, 1000);
+        }, 600);
       } else {
-        setErrorMessage(res.error || 'Código incorreto. Verifique o código de 6 dígitos no seu email.');
+        setErrorMessage('Não foi possível sincronizar o perfil com a conta Google.');
       }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Erro ao verificar código de confirmação.');
+    } catch (error: any) {
+      console.error('Falha na autenticação Google:', error);
+      if (error.code === 'auth/popup-closed-by-user') {
+        setErrorMessage('A janela de autenticação Google foi fechada antes de concluir.');
+      } else if (error.code === 'auth/popup-blocked') {
+        setErrorMessage('O navegador bloqueou o pop-up do Google. Por favor permita pop-ups nesta página.');
+      } else {
+        setErrorMessage(error.message || 'Erro ao iniciar sessão com a Conta Google.');
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleResendConfirmation = async () => {
-    const targetEmail = sentToEmail || email;
-    if (!targetEmail) return;
-
-    setIsResendingCode(true);
-    setErrorMessage(null);
-    try {
-      const res = await resendConfirmationEmail(targetEmail);
-      if (res.success) {
-        setSuccessMessage(res.message || `Novo código enviado com sucesso para ${targetEmail}.`);
-      } else {
-        setErrorMessage(res.error || 'Não foi possível reenviar o código.');
-      }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Erro ao reenviar email de confirmação.');
-    } finally {
-      setIsResendingCode(false);
-    }
-  };
-
-  const handleSendResetEmail = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.trim() || !email.includes('@')) {
-      setErrorMessage('Por favor introduza o seu endereço de email válido.');
-      return;
-    }
-
+  const handleQuickAccountLogin = async (acc: typeof savedAccounts[0]) => {
     setIsLoading(true);
     setErrorMessage(null);
-    setSuccessMessage(null);
-
     try {
-      const res = await sendPasswordResetEmail(email.trim());
-      if (res.success) {
-        setSentToEmail(email.trim());
-        setResetStep('verify');
-        setSuccessMessage(res.message);
-      } else {
-        setErrorMessage(res.error || 'Não foi possível enviar o email de recuperação. Tente novamente.');
-      }
+      const profile = accountToProfile(acc);
+      setSuccessMessage(`A iniciar sessão no perfil de ${acc.name}...`);
+      setTimeout(() => {
+        onAuthenticated(profile);
+      }, 500);
     } catch (err: any) {
-      setErrorMessage(err.message || 'Erro ao enviar email de recuperação.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleVerifyAndResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!resetCode.trim()) {
-      setErrorMessage('Por favor introduza o código de 6 dígitos recebido por email.');
-      return;
-    }
-    if (!newPassword.trim() || newPassword.length < 6) {
-      setErrorMessage('A nova palavra-passe deve conter pelo menos 6 caracteres.');
-      return;
-    }
-
-    setIsLoading(true);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-
-    try {
-      const res = await resetAccountPassword(sentToEmail || email, resetCode, newPassword);
-      if (res.success) {
-        setSuccessMessage(`${res.message} A iniciar sessão automaticamente...`);
-        // Try direct login with new credentials
-        setTimeout(async () => {
-          const loginRes = await loginWithEmailPassword(sentToEmail || email, newPassword);
-          if (loginRes.success && loginRes.account) {
-            onAuthenticated(accountToProfile(loginRes.account));
-          } else {
-            setMode('login');
-            setPassword('');
-          }
-        }, 1200);
-      } else {
-        setErrorMessage(res.message || 'Não foi possível redefinir a palavra-passe.');
-      }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Erro ao redefinir a palavra-passe.');
-    } finally {
+      setErrorMessage(err.message || 'Erro ao aceder ao perfil.');
       setIsLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen w-full bg-[#0B090E] text-zinc-100 flex flex-col justify-center items-center p-4 sm:p-6 lg:p-8 relative overflow-hidden selection:bg-red-500 selection:text-white">
-      {/* Background Ambience / Glow */}
-      <div className="absolute top-[-15%] left-1/2 -translate-x-1/2 w-[700px] h-[500px] bg-gradient-to-b from-red-600/15 via-orange-600/10 to-transparent rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-5%] w-[450px] h-[350px] bg-red-950/20 rounded-full blur-3xl pointer-events-none" />
+      {/* Dynamic Background Glows */}
+      <div 
+        className="absolute -top-32 -left-32 w-96 h-96 opacity-25 blur-3xl pointer-events-none"
+        style={{ background: 'radial-gradient(circle, #ea580c 0%, #dc2626 50%, transparent 75%)' }}
+      />
+      <div 
+        className="absolute -bottom-32 -right-32 w-96 h-96 opacity-25 blur-3xl pointer-events-none"
+        style={{ background: 'radial-gradient(circle, #4285F4 0%, #2563eb 50%, transparent 75%)' }}
+      />
 
-      {/* Main Container */}
-      <div className="w-full max-w-md z-10 space-y-6">
-        {/* Brand Header */}
-        <div className="text-center space-y-3">
-          <BlazeTrackLogo variant="full" size="lg" subtitle="GESTÃO OPERACIONAL" />
-          <p className="text-xs text-zinc-400 max-w-xs mx-auto">
-            Registo de Horas de Voluntariado, Instrução e Gratificações
-          </p>
+      <div className="w-full max-w-md space-y-6 relative z-10">
+        {/* Branding & Logo Header */}
+        <div className="text-center">
+          <div className="inline-flex items-center justify-center p-4 bg-[#171222] border border-[#2B213A] rounded-3xl shadow-xl shadow-red-950/40">
+            <BlazeTrackLogo 
+              subtitle="Gestão Operacional de Voluntariado, Instrução e Gratificações" 
+            />
+          </div>
         </div>
 
-        {/* Auth Card */}
-        <div className="bg-[#130F1A] border border-[#261E34] rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/80 space-y-5">
-          {/* Mode Switch Tabs or Header */}
-          {mode === 'login' || mode === 'signup' ? (
-            <div className="grid grid-cols-2 p-1.5 bg-[#1A1424] border border-[#2D233E] rounded-2xl">
-              <button
-                type="button"
-                id="tab-login"
-                onClick={() => {
-                  setMode('login');
-                  setErrorMessage(null);
-                  setSuccessMessage(null);
-                }}
-                className={`py-2.5 text-xs font-black rounded-xl transition-all cursor-pointer ${
-                  mode === 'login'
-                    ? 'bg-gradient-to-r from-red-600 to-orange-600 text-white shadow-md'
-                    : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                Iniciar Sessão
-              </button>
-              <button
-                type="button"
-                id="tab-signup"
-                onClick={() => {
-                  setMode('signup');
-                  setErrorMessage(null);
-                  setSuccessMessage(null);
-                }}
-                className={`py-2.5 text-xs font-black rounded-xl transition-all cursor-pointer ${
-                  mode === 'signup'
-                    ? 'bg-gradient-to-r from-red-600 to-orange-600 text-white shadow-md'
-                    : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                Criar Nova Conta
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between pb-2 border-b border-[#261E34]">
-              <button
-                type="button"
-                id="back-to-login-btn"
-                onClick={() => {
-                  setMode('login');
-                  setResetStep('request');
-                  setErrorMessage(null);
-                  setSuccessMessage(null);
-                }}
-                className="inline-flex items-center space-x-1.5 text-xs font-bold text-zinc-400 hover:text-white transition-colors cursor-pointer"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Voltar ao Início de Sessão</span>
-              </button>
-              <span className="text-xs font-black text-orange-400 uppercase tracking-wider">
-                {mode === 'confirm-email' ? 'Ativação de Conta' : 'Recuperação'}
-              </span>
-            </div>
-          )}
+        {/* Main Card */}
+        <div className="bg-[#120E1A] border border-[#251C33] rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5">
+          {/* Header Title */}
+          <div className="text-center space-y-1">
+            <h2 className="text-lg font-bold text-white">
+              Acesso com Conta Google
+            </h2>
+            <p className="text-xs text-zinc-400">
+              Autenticação simplificada e envio direto de relatórios via Gmail API
+            </p>
+          </div>
 
           {/* Status Alerts */}
           {successMessage && (
@@ -347,333 +126,94 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthenticated }) => {
             </div>
           )}
 
-          {/* Confirm Email View */}
-          {mode === 'confirm-email' && (
-            <div className="space-y-4 animate-in fade-in">
-              <div className="p-4 bg-[#171222] border border-[#2D2140] rounded-2xl space-y-2 text-xs">
-                <div className="flex items-center space-x-2 font-bold text-amber-400">
-                  <MailCheck className="w-4 h-4" />
-                  <span>Confirmação Obrigatória de Email</span>
-                </div>
-                <p className="text-zinc-300 leading-relaxed">
-                  Para aceder ao portal, enviámos um código de ativação de 6 dígitos para o endereço:
-                </p>
-                <div className="p-2 bg-[#100C18] border border-[#281E38] rounded-xl font-mono text-amber-300 text-xs font-bold text-center break-all">
-                  {sentToEmail || email}
-                </div>
-                <p className="text-[11px] text-zinc-400">
-                  Verifique a sua caixa de entrada (ou pasta de spam) e introduza o código de 6 dígitos para validar o seu email.
-                </p>
-              </div>
-
-              <form onSubmit={handleConfirmCodeSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-zinc-300 mb-1.5 text-center">
-                    Código de Confirmação (6 Dígitos)
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      required
-                      autoFocus
-                      maxLength={6}
-                      placeholder="• • • • • •"
-                      value={confirmationCode}
-                      onChange={(e) => setConfirmationCode(e.target.value.replace(/\D/g, ''))}
-                      className="w-full py-3.5 px-4 bg-[#171222] border-2 border-amber-500/40 focus:border-amber-400 rounded-2xl text-amber-200 text-center font-mono text-xl font-black tracking-[0.4em] outline-none placeholder-zinc-600 transition-all shadow-inner"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <button
-                    type="submit"
-                    disabled={isLoading || confirmationCode.length < 6}
-                    id="submit-confirmation-code-btn"
-                    className="w-full py-3.5 px-4 bg-gradient-to-r from-amber-600 via-orange-600 to-red-600 hover:from-amber-500 hover:to-red-500 active:from-amber-700 active:to-red-700 text-white font-bold text-xs rounded-xl shadow-lg shadow-amber-950/60 flex items-center justify-center space-x-2 transition-all cursor-pointer disabled:opacity-50"
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>A validar código...</span>
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>Confirmar Email e Entrar</span>
-                      </>
-                    )}
-                  </button>
-
-                  <div className="flex items-center justify-between pt-1">
-                    <button
-                      type="button"
-                      onClick={handleResendConfirmation}
-                      disabled={isResendingCode}
-                      className="text-[11px] font-bold text-zinc-400 hover:text-amber-300 inline-flex items-center space-x-1 transition-colors cursor-pointer disabled:opacity-50"
-                    >
-                      <RefreshCw className={`w-3 h-3 ${isResendingCode ? 'animate-spin' : ''}`} />
-                      <span>Reenviar código por email</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMode('signup');
-                        setErrorMessage(null);
-                        setSuccessMessage(null);
-                      }}
-                      className="text-[11px] font-bold text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
-                    >
-                      Alterar email
-                    </button>
-                  </div>
-                </div>
-              </form>
-            </div>
-          )}
-
-          {/* Regular Login / Signup View */}
-          {(mode === 'login' || mode === 'signup') && (
-            <>
-              {/* Form */}
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {mode === 'signup' && (
-                  <div>
-                    <label className="block text-xs font-bold text-zinc-300 mb-1.5">
-                      Nome Completo
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Ex: Gonçalo Silva"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 bg-[#171222] border border-[#2C223E] rounded-xl text-white text-xs outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 placeholder-zinc-500 transition-all"
-                      />
-                      <User className="w-4 h-4 text-zinc-500 absolute left-3.5 top-3.5" />
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-xs font-bold text-zinc-300 mb-1.5">
-                    Endereço de Email
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="email"
-                      required
-                      placeholder="bombeiro@exemplo.pt"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 bg-[#171222] border border-[#2C223E] rounded-xl text-white text-xs outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 placeholder-zinc-500 font-mono transition-all"
-                    />
-                    <Mail className="w-4 h-4 text-zinc-500 absolute left-3.5 top-3.5" />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-bold text-zinc-300">
-                      Palavra-passe
-                    </label>
-                    {mode === 'login' ? (
-                      <button
-                        type="button"
-                        id="forgot-password-link"
-                        onClick={() => {
-                          setMode('forgot-password');
-                          setResetStep('request');
-                          setErrorMessage(null);
-                          setSuccessMessage(null);
-                        }}
-                        className="text-[11px] font-bold text-orange-400 hover:text-orange-300 transition-colors cursor-pointer"
-                      >
-                        Recuperar palavra-passe por email
-                      </button>
-                    ) : (
-                      <span className="text-[10px] text-zinc-500">Mínimo 6 caracteres</span>
-                    )}
-                  </div>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      required
-                      placeholder={mode === 'signup' ? 'Defina a sua palavra-passe' : 'A sua palavra-passe'}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pl-10 pr-11 py-3 bg-[#171222] border border-[#2C223E] rounded-xl text-white text-xs outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 placeholder-zinc-500 transition-all"
-                    />
-                    <Lock className="w-4 h-4 text-zinc-500 absolute left-3.5 top-3.5" />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3.5 top-3 text-zinc-500 hover:text-zinc-300 cursor-pointer p-1"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                {mode === 'signup' && (
-                  <div className="p-3 bg-[#171222] rounded-xl border border-[#271E36] text-[11px] text-zinc-400 space-y-1">
-                    <p className="font-semibold text-zinc-300 flex items-center space-x-1">
-                      <Mail className="w-3.5 h-3.5 text-orange-400" />
-                      <span>Confirmação de Registo por Email</span>
-                    </p>
-                    <p>Ao criar a conta, será enviado um link de confirmação para o seu email.</p>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  id="auth-submit-btn"
-                  className="w-full py-3.5 px-4 bg-gradient-to-r from-red-600 via-orange-600 to-amber-600 hover:from-red-500 hover:to-orange-500 active:from-red-700 active:to-orange-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-red-950/60 flex items-center justify-center space-x-2 transition-all cursor-pointer disabled:opacity-50 mt-3"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>A autenticar...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>{mode === 'login' ? 'Entrar no Sistema' : 'Criar Conta e Enviar Confirmação'}</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
-              </form>
-            </>
-          )}
-
-          {/* Forgot Password View */}
-          {mode === 'forgot-password' && (
-            <div className="space-y-4 animate-in fade-in">
-              <div className="p-3.5 bg-[#171222] border border-[#2A2038] rounded-2xl space-y-1 text-xs text-zinc-300">
-                <div className="flex items-center space-x-2 font-bold text-orange-400">
-                  <KeyRound className="w-4 h-4" />
-                  <span>Recuperação de Palavra-passe por Email</span>
-                </div>
-                <p className="text-[11px] text-zinc-400">
-                  {resetStep === 'request'
-                    ? 'Introduza o seu email associado à conta para receber o link e o código de recuperação.'
-                    : `Introduza o código de 6 dígitos enviado para ${sentToEmail} e defina a sua nova palavra-passe.`}
-                </p>
-              </div>
-
-              {resetStep === 'request' ? (
-                <form onSubmit={handleSendResetEmail} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-zinc-300 mb-1.5">
-                      Endereço de Email da Conta
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="email"
-                        required
-                        placeholder="exemplo@bv.pt"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 bg-[#171222] border border-[#2C223E] rounded-xl text-white text-xs outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 placeholder-zinc-500 font-mono transition-all"
-                      />
-                      <Mail className="w-4 h-4 text-zinc-500 absolute left-3.5 top-3.5" />
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={isLoading}
-                    id="send-reset-email-btn"
-                    className="w-full py-3.5 px-4 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 active:from-orange-700 active:to-amber-700 text-white font-bold text-xs rounded-xl shadow-lg shadow-orange-950/60 flex items-center justify-center space-x-2 transition-all cursor-pointer disabled:opacity-50"
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>A enviar email de recuperação...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Send className="w-4 h-4" />
-                        <span>Enviar Link e Código de Recuperação</span>
-                      </>
-                    )}
-                  </button>
-                </form>
+          {/* Main Google Sign-In Action */}
+          <div className="space-y-4 pt-1">
+            <button
+              type="button"
+              id="google-signin-main-btn"
+              disabled={isLoading}
+              onClick={handleGoogleSignIn}
+              className="w-full py-3.5 px-5 bg-white hover:bg-zinc-100 active:bg-zinc-200 text-zinc-900 font-bold text-sm rounded-2xl shadow-xl flex items-center justify-center space-x-3 transition-all cursor-pointer border border-zinc-200 group disabled:opacity-50"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin text-zinc-800" />
+                  <span className="text-zinc-800">A contactar o Google...</span>
+                </>
               ) : (
-                <form onSubmit={handleVerifyAndResetPassword} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-zinc-300 mb-1.5">
-                      Código de 6 Dígitos (Recebido por Email)
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        required
-                        maxLength={6}
-                        placeholder="Ex: 123456"
-                        value={resetCode}
-                        onChange={(e) => setResetCode(e.target.value.replace(/\D/g, ''))}
-                        className="w-full pl-10 pr-4 py-3 bg-[#171222] border border-[#2C223E] rounded-xl text-white text-center tracking-widest font-mono text-sm outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 placeholder-zinc-500 transition-all"
-                      />
-                      <KeyRound className="w-4 h-4 text-zinc-500 absolute left-3.5 top-3.5" />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-zinc-300 mb-1.5">
-                      Nova Palavra-passe
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showNewPassword ? 'text' : 'password'}
-                        required
-                        placeholder="Mínimo 6 caracteres"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        className="w-full pl-10 pr-11 py-3 bg-[#171222] border border-[#2C223E] rounded-xl text-white text-xs outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 placeholder-zinc-500 transition-all"
-                      />
-                      <Lock className="w-4 h-4 text-zinc-500 absolute left-3.5 top-3.5" />
-                      <button
-                        type="button"
-                        onClick={() => setShowNewPassword(!showNewPassword)}
-                        className="absolute right-3.5 top-3 text-zinc-500 hover:text-zinc-300 cursor-pointer p-1"
-                      >
-                        {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="flex space-x-2">
-                    <button
-                      type="button"
-                      onClick={() => setResetStep('request')}
-                      className="py-3 px-3 bg-[#1B1426] hover:bg-[#231A32] text-zinc-400 hover:text-zinc-200 text-xs font-bold rounded-xl transition-all cursor-pointer border border-[#2B213B]"
-                    >
-                      Reenviar
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isLoading}
-                      id="save-new-password-btn"
-                      className="flex-1 py-3 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:from-emerald-700 active:to-teal-700 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-950/60 flex items-center justify-center space-x-2 transition-all cursor-pointer disabled:opacity-50"
-                    >
-                      {isLoading ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>A guardar...</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="w-4 h-4" />
-                          <span>Guardar Nova Palavra-passe</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
+                <>
+                  {/* Google SVG G Icon */}
+                  <svg viewBox="0 0 24 24" className="w-5 h-5 shrink-0">
+                    <path
+                      fill="#4285F4"
+                      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.34 24 12 24z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+                    />
+                  </svg>
+                  <span className="text-zinc-900 tracking-tight">Entrar com Google</span>
+                  <ArrowRight className="w-4 h-4 text-zinc-500 group-hover:translate-x-0.5 transition-transform" />
+                </>
               )}
+            </button>
+
+            {/* Google Features Checklist */}
+            <div className="p-3.5 bg-[#171222] border border-[#271E36] rounded-2xl space-y-2 text-xs text-zinc-400">
+              <div className="flex items-center space-x-2 text-zinc-300 font-semibold text-[11px]">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>Integração Nativa Google Workspace</span>
+              </div>
+              <ul className="space-y-1.5 pl-6 list-disc text-[11px] text-zinc-400">
+                <li>Sem necessidade de memorizar palavras-passe adicionais</li>
+                <li>Envio direto de relatórios PDF oficiais através da API do Gmail</li>
+                <li>Sincronização de escalas com o Google Calendar</li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Quick profile switcher if accounts exist */}
+          {savedAccounts.length > 0 && (
+            <div className="pt-3 border-t border-[#231A30] space-y-2">
+              <div className="flex items-center justify-between text-[11px] text-zinc-400 font-medium">
+                <span>Perfis recentes guardados:</span>
+                <span className="text-[10px] text-zinc-500">{savedAccounts.length} disponíveis</span>
+              </div>
+              <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                {savedAccounts.slice(0, 3).map((acc) => (
+                  <button
+                    key={acc.id}
+                    type="button"
+                    onClick={() => handleQuickAccountLogin(acc)}
+                    disabled={isLoading}
+                    className="w-full flex items-center justify-between p-2.5 bg-[#181324] hover:bg-[#201830] active:bg-[#271E3A] border border-[#291F3C] rounded-xl text-left transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center space-x-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-orange-600/20 border border-orange-500/30 flex items-center justify-center text-xs font-bold text-orange-300">
+                        {acc.firefighterNumber ? acc.firefighterNumber.slice(-2) : 'BV'}
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-zinc-200 group-hover:text-white">
+                          {acc.name}
+                        </div>
+                        <div className="text-[10px] text-zinc-400">
+                          {acc.rank} • N.º {acc.firefighterNumber}
+                        </div>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors" />
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -697,7 +237,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthenticated }) => {
         {/* Security Note Footer */}
         <div className="flex items-center justify-center space-x-2 text-xs text-zinc-500">
           <ShieldCheck className="w-4 h-4 text-emerald-500" />
-          <span>Acesso Protegido • Supabase Cloud & Notificações por Email</span>
+          <span>Acesso Seguro via Google OAuth 2.0 & Supabase Cloud</span>
         </div>
       </div>
     </div>

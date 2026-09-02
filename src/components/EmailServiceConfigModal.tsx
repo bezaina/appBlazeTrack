@@ -15,7 +15,12 @@ import {
   Sliders, 
   X,
   FileText,
-  Activity
+  Activity,
+  Code2,
+  Copy,
+  Check,
+  MessageSquare,
+  Sparkles
 } from 'lucide-react';
 import { 
   SmtpConfig, 
@@ -25,7 +30,13 @@ import {
   testSmtpConnection, 
   sendPinRecoveryEmail,
   getServerEmailStatus,
-  ServerEmailStatus
+  ServerEmailStatus,
+  sendContactFormViaResend,
+  getSavedResendApiKey,
+  saveResendApiKey,
+  getSavedGasWebhookUrl,
+  saveGasWebhookUrl,
+  ContactFormResult
 } from '../services/emailService';
 import { 
   triggerSupabasePasswordReset, 
@@ -109,8 +120,19 @@ export const EmailServiceConfigModal: React.FC<EmailServiceConfigModalProps> = (
   const [testTypeRunning, setTestTypeRunning] = useState<string | null>(null);
   const [serverStatus, setServerStatus] = useState<ServerEmailStatus | null>(null);
   const [testResult, setTestResult] = useState<SmtpTestResult | null>(null);
-  const [activeTab, setActiveTab] = useState<'testing' | 'settings' | 'guide'>('testing');
+  const [activeTab, setActiveTab] = useState<'testing' | 'settings' | 'guide' | 'resend_gas'>('testing');
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Resend & Google Apps Script Form State
+  const [contactNome, setContactNome] = useState(profile.name || '');
+  const [contactEmail, setContactEmail] = useState(profile.autoEmailAddress || 'jagamaal@gmail.com');
+  const [contactMsg, setContactMsg] = useState('Mensagem de teste do formulário via Resend e Google Apps Script.');
+  const [contactSubject, setContactSubject] = useState(`Novo contacto de ${profile.name || 'Bombeiro'}`);
+  const [contactResendKey, setContactResendKey] = useState('');
+  const [contactGasUrl, setContactGasUrl] = useState('');
+  const [isSendingContact, setIsSendingContact] = useState(false);
+  const [contactResult, setContactResult] = useState<ContactFormResult | null>(null);
+  const [gasCodeCopied, setGasCodeCopied] = useState(false);
 
   // Load existing configuration on open
   useEffect(() => {
@@ -134,6 +156,10 @@ export const EmailServiceConfigModal: React.FC<EmailServiceConfigModalProps> = (
       }
 
       setTestRecipient(profile.autoEmailAddress || 'JAGAMAAL@gmail.com');
+      setContactNome(profile.name || '');
+      setContactEmail(profile.autoEmailAddress || 'jagamaal@gmail.com');
+      setContactResendKey(getSavedResendApiKey());
+      setContactGasUrl(getSavedGasWebhookUrl());
       fetchServerStatus();
     }
   }, [isOpen, profile]);
@@ -353,6 +379,18 @@ export const EmailServiceConfigModal: React.FC<EmailServiceConfigModalProps> = (
           >
             <HelpCircle className="w-3.5 h-3.5" />
             <span>Guia do Supabase Dashboard</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('resend_gas')}
+            className={`pb-3 px-4 text-xs font-semibold flex items-center space-x-2 border-b-2 transition-colors cursor-pointer ${
+              activeTab === 'resend_gas'
+                ? 'border-orange-500 text-amber-300'
+                : 'border-transparent text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <Code2 className="w-3.5 h-3.5 text-orange-400" />
+            <span>Resend & Apps Script (UrlFetchApp)</span>
           </button>
         </div>
 
@@ -765,6 +803,327 @@ export const EmailServiceConfigModal: React.FC<EmailServiceConfigModalProps> = (
                   <strong>Dica de Segurança:</strong> Ao ativar o Custom SMTP no Supabase, a limitação de 3 emails por hora da versão gratuita deixa de existir, permitindo que todos os bombeiros do quartel recebam confirmações e relatórios instantaneamente.
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* TAB 4: RESEND & GOOGLE APPS SCRIPT (UrlFetchApp) */}
+          {activeTab === 'resend_gas' && (
+            <div className="space-y-6">
+              
+              {/* Header Card */}
+              <div className="bg-gradient-to-r from-red-950/40 via-orange-950/30 to-amber-950/20 border border-orange-500/30 rounded-2xl p-5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="p-2 bg-orange-600/20 text-orange-400 rounded-lg border border-orange-500/30">
+                      <Code2 className="w-4 h-4" />
+                    </div>
+                    <h3 className="text-sm font-bold text-white">
+                      Integração de Formulário com Resend & UrlFetchApp (Google Apps Script)
+                    </h3>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase bg-orange-500/20 text-orange-300 border border-orange-500/30">
+                    Geral &lt;geral@appblazetrack.com&gt;
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-300 leading-relaxed">
+                  Esta função do Google Apps Script usa a API <code className="bg-black/40 px-1.5 py-0.5 rounded text-amber-300 font-mono">UrlFetchApp</code> para enviar os dados de formulários Web ou Google Forms diretamente para <strong className="text-white">jagamaal@gmail.com</strong> através do domínio validado na Spaceship (<strong className="text-red-400">appblazetrack.com</strong>).
+                </p>
+              </div>
+
+              {/* Live Interactive Test Form */}
+              <div className="bg-[#181824] border border-[#28283a] rounded-xl p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center space-x-2">
+                    <Zap className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Testar Envio do Formulário ao Vivo</span>
+                  </h4>
+                  <span className="text-[11px] text-zinc-400">
+                    Destino: <strong className="text-zinc-200">jagamaal@gmail.com</strong>
+                  </span>
+                </div>
+
+                {contactResult && (
+                  <div className={`p-3.5 rounded-xl border text-xs flex items-start space-x-2.5 ${
+                    contactResult.success 
+                      ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-200' 
+                      : 'bg-red-950/30 border-red-500/40 text-red-200'
+                  }`}>
+                    {contactResult.success ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                    )}
+                    <div className="space-y-1">
+                      <div className="font-bold">{contactResult.message}</div>
+                      {contactResult.provider && (
+                        <div className="text-[10px] opacity-75 font-mono">
+                          Canal: {contactResult.provider} {contactResult.messageId ? `• ID: ${contactResult.messageId}` : ''}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-zinc-400">Nome do Remetente (nome)</label>
+                    <input
+                      type="text"
+                      value={contactNome}
+                      onChange={(e) => setContactNome(e.target.value)}
+                      placeholder="Ex: Gonçalo Silva (BV-1428)"
+                      className="w-full bg-[#101016] border border-[#2c2c3c] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-red-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-zinc-400">Email do Utilizador (emailUtilizador)</label>
+                    <input
+                      type="email"
+                      value={contactEmail}
+                      onChange={(e) => setContactEmail(e.target.value)}
+                      placeholder="ex: bombeiro@gmail.com"
+                      className="w-full bg-[#101016] border border-[#2c2c3c] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-red-500 font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-zinc-400">Mensagem (mensagem)</label>
+                  <textarea
+                    rows={3}
+                    value={contactMsg}
+                    onChange={(e) => setContactMsg(e.target.value)}
+                    placeholder="Conteúdo da mensagem..."
+                    className="w-full bg-[#101016] border border-[#2c2c3c] rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-red-500 custom-scrollbar"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-zinc-400">Chave API Resend (Opcional se definida no servidor)</label>
+                    <input
+                      type="password"
+                      value={contactResendKey}
+                      onChange={(e) => {
+                        setContactResendKey(e.target.value);
+                        saveResendApiKey(e.target.value);
+                      }}
+                      placeholder="re_xxxxxxxxxxxx"
+                      className="w-full bg-[#101016] border border-[#2c2c3c] rounded-lg px-3 py-2 text-xs text-white font-mono"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-zinc-400">URL Web App Google Apps Script (Opcional)</label>
+                    <input
+                      type="url"
+                      value={contactGasUrl}
+                      onChange={(e) => {
+                        setContactGasUrl(e.target.value);
+                        saveGasWebhookUrl(e.target.value);
+                      }}
+                      placeholder="https://script.google.com/macros/s/.../exec"
+                      className="w-full bg-[#101016] border border-[#2c2c3c] rounded-lg px-3 py-2 text-xs text-white font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="button"
+                    disabled={isSendingContact || !contactNome || !contactEmail || !contactMsg}
+                    onClick={async () => {
+                      setIsSendingContact(true);
+                      setContactResult(null);
+
+                      const res = await sendContactFormViaResend({
+                        nome: contactNome,
+                        emailUtilizador: contactEmail,
+                        mensagem: contactMsg,
+                        assunto: contactSubject,
+                        apiKey: contactResendKey.trim() || undefined,
+                        gasWebhookUrl: contactGasUrl.trim() || undefined,
+                        from: 'Geral <geral@appblazetrack.com>',
+                        to: 'jagamaal@gmail.com',
+                      });
+
+                      setContactResult(res);
+                      setIsSendingContact(false);
+                    }}
+                    className="px-4 py-2.5 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-lg shadow-red-950/60 flex items-center space-x-2 transition-all cursor-pointer"
+                  >
+                    {isSendingContact ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <span>A Enviar via Resend / GAS...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Disparar Teste de Envio Agora</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Code Snippet Card */}
+              <div className="bg-[#181824] border border-[#28283a] rounded-xl p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center space-x-2">
+                    <FileText className="w-3.5 h-3.5 text-orange-400" />
+                    <span>Código Google Apps Script (Codigo.gs)</span>
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const code = `function enviarEmailPeloResend(nome, emailUtilizador, mensagem) {
+  // Cole aqui a sua API Key do Resend (começa com re_...)
+  var apiKey = "${contactResendKey || 'SUA_API_KEY_DO_RESEND_AQUI'}";
+  
+  var url = "https://api.resend.com/emails";
+  
+  var payload = {
+    "from": "Geral <geral@appblazetrack.com>", // Use o seu domínio verificado na Spaceship
+    "to": ["jagamaal@gmail.com"], // Onde quer receber a mensagem
+    "subject": "Novo contacto de " + nome,
+    "html": "<p><strong>Nome:</strong> " + nome + "</p>" +
+            "<p><strong>Email:</strong> " + emailUtilizador + "</p>" +
+            "<p><strong>Mensagem:</strong> " + mensagem + "</p>"
+  };
+
+  var options = {
+    "method": "post",
+    "contentType": "application/json",
+    "headers": {
+      "Authorization": "Bearer " + apiKey
+    },
+    "payload": JSON.stringify(payload),
+    "muteHttpExceptions": true
+  };
+
+  try {
+    var response = UrlFetchApp.fetch(url, options);
+    var resultado = JSON.parse(response.getContentText());
+    Logger.log("E-mail enviado com sucesso: " + JSON.stringify(resultado));
+    return true;
+  } catch (error) {
+    Logger.log("Erro ao enviar e-mail: " + error.toString());
+    return false;
+  }
+}
+
+// Handler para receber dados de formulários Web via POST
+function doPost(e) {
+  var data = {};
+  if (e && e.postData && e.postData.contents) {
+    try { data = JSON.parse(e.postData.contents); } catch(err) { data = e.parameter || {}; }
+  } else if (e && e.parameter) {
+    data = e.parameter;
+  }
+  
+  var nome = data.nome || "Contacto";
+  var email = data.emailUtilizador || data.email || "";
+  var mensagem = data.mensagem || "";
+  
+  var ok = enviarEmailPeloResend(nome, email, mensagem);
+  
+  return ContentService.createTextOutput(JSON.stringify({
+    status: ok ? "success" : "error",
+    message: ok ? "Enviado com sucesso!" : "Falha ao enviar."
+  })).setMimeType(ContentService.MimeType.JSON);
+}
+
+// Handler automático para Google Forms ligados a Google Sheets
+function onFormSubmit(e) {
+  if (!e || !e.namedValues) return;
+  var nome = (e.namedValues["Nome"] && e.namedValues["Nome"][0]) || "Utilizador";
+  var email = (e.namedValues["Email"] && e.namedValues["Email"][0]) || "";
+  var mensagem = (e.namedValues["Mensagem"] && e.namedValues["Mensagem"][0]) || "";
+  enviarEmailPeloResend(nome, email, mensagem);
+}`;
+                      navigator.clipboard.writeText(code);
+                      setGasCodeCopied(true);
+                      setTimeout(() => setGasCodeCopied(false), 2500);
+                    }}
+                    className="px-3 py-1.5 bg-[#20202e] hover:bg-[#2c2c3e] border border-[#34344e] rounded-lg text-zinc-200 text-xs font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer"
+                  >
+                    {gasCodeCopied ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="text-emerald-300">Copiado!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copiar Código Completo .gs</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="bg-[#0f0f16] border border-[#242434] rounded-lg p-4 font-mono text-[11px] text-zinc-300 overflow-x-auto max-h-72 custom-scrollbar">
+                  <pre className="text-zinc-300 whitespace-pre">
+{`function enviarEmailPeloResend(nome, emailUtilizador, mensagem) {
+  // Cole aqui a sua API Key do Resend (começa com re_...)
+  var apiKey = "${contactResendKey || 'SUA_API_KEY_DO_RESEND_AQUI'}";
+  
+  var url = "https://api.resend.com/emails";
+  
+  var payload = {
+    "from": "Geral <geral@appblazetrack.com>", // Use o seu domínio verificado na Spaceship
+    "to": ["jagamaal@gmail.com"], // Onde quer receber a mensagem
+    "subject": "Novo contacto de " + nome,
+    "html": "<p><strong>Nome:</strong> " + nome + "</p>" +
+            "<p><strong>Email:</strong> " + emailUtilizador + "</p>" +
+            "<p><strong>Mensagem:</strong> " + mensagem + "</p>"
+  };
+
+  var options = {
+    "method": "post",
+    "contentType": "application/json",
+    "headers": {
+      "Authorization": "Bearer " + apiKey
+    },
+    "payload": JSON.stringify(payload),
+    "muteHttpExceptions": true
+  };
+
+  try {
+    var response = UrlFetchApp.fetch(url, options);
+    var resultado = JSON.parse(response.getContentText());
+    Logger.log("E-mail enviado com sucesso: " + JSON.stringify(resultado));
+    return true;
+  } catch (error) {
+    Logger.log("Erro ao enviar e-mail: " + error.toString());
+    return false;
+  }
+}
+
+// Recebe requisições de formulários Web via POST
+function doPost(e) { ... }
+
+// Recebe submissões de Google Forms ligados a Folha de Cálculo
+function onFormSubmit(e) { ... }`}
+                  </pre>
+                </div>
+              </div>
+
+              {/* Instructions steps */}
+              <div className="bg-[#181824] border border-[#28283a] rounded-xl p-5 space-y-3 text-xs text-zinc-300">
+                <h4 className="font-bold text-white flex items-center space-x-2">
+                  <HelpCircle className="w-4 h-4 text-orange-400" />
+                  <span>Passo a Passo para Implementar no Google Apps Script</span>
+                </h4>
+                <ol className="list-decimal list-inside space-y-2 text-zinc-300 leading-relaxed">
+                  <li>Aceda a <a href="https://script.google.com" target="_blank" rel="noreferrer" className="text-orange-400 underline font-semibold">script.google.com</a> e crie um novo projeto.</li>
+                  <li>Cole o código acima e insira a sua chave do Resend (<code className="bg-black/40 px-1 py-0.5 rounded text-amber-300 font-mono">re_...</code>).</li>
+                  <li>Clique em <strong className="text-white">Implementar (Deploy) &gt; Nova Implementação</strong>, selecione o tipo <strong className="text-white">Aplicação Web</strong> e configure o acesso para <strong className="text-emerald-400">Qualquer pessoa (Anyone)</strong>.</li>
+                  <li>Copie o URL gerado da Aplicação Web e use-o no campo de Webhook para receber os contactos diretamente!</li>
+                </ol>
+              </div>
+
             </div>
           )}
 

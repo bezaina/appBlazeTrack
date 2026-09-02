@@ -44,6 +44,7 @@ import { PinLockModal } from './components/PinLockModal';
 import { GoogleAuthModal } from './components/GoogleAuthModal';
 import { AuthModal } from './components/AuthModal';
 import { SupabaseConnectModal } from './components/SupabaseConnectModal';
+import { ContactFormModal } from './components/ContactFormModal';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { AuthScreen } from './components/AuthScreen';
 import confetti from 'canvas-confetti';
@@ -93,6 +94,7 @@ export default function App() {
   const [isGoogleAuthOpen, setIsGoogleAuthOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
+  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
   const [recordModalType, setRecordModalType] = useState<ModalRecordType>('volunteer');
   const [recordToEdit, setRecordToEdit] = useState<VolunteerServiceRecord | InstructionRecord | GratificationRecord | null>(null);
   const [prefillFromShift, setPrefillFromShift] = useState<{
@@ -636,6 +638,7 @@ export default function App() {
         onOpenGoogleAuth={() => setIsGoogleAuthOpen(true)}
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
         onOpenSupabaseConnect={() => setIsSupabaseModalOpen(true)}
+        onOpenContactModal={() => setIsContactModalOpen(true)}
         onSyncSupabase={handleManualSupabaseSync}
         isSyncingSupabase={isSyncingSupabase}
         onLockApp={() => setIsLocked(true)}
@@ -920,6 +923,13 @@ export default function App() {
           initialMonth={selectedMonth}
         />
       )}
+
+      {/* Resend & Google Apps Script Contact Form Modal */}
+      <ContactFormModal
+        isOpen={isContactModalOpen}
+        onClose={() => setIsContactModalOpen(false)}
+        profile={profile}
+      />
     </div>
   );
 }

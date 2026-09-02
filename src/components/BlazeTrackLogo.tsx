@@ -107,7 +107,7 @@ export const BlazeTrackLogo: React.FC<BlazeTrackLogoProps> = ({
           BLAZETRACK
         </span>
         {subtitle && (
-          <span className={`font-bold tracking-[0.25em] ${currentSize.sub} text-zinc-400 uppercase mt-0.5`}>
+          <span className={`text-xs text-zinc-400 font-medium mt-1 leading-snug max-w-xs ${theme === 'light' ? 'text-slate-600' : 'text-zinc-400'}`}>
             {subtitle}
           </span>
         )}

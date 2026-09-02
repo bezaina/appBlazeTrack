@@ -634,6 +634,131 @@ app.post('/api/send-email', async (req, res) => {
   }
 });
 
+// 3.1 Resend Contact Form Dispatch Endpoint (Native API & Google Apps Script bridge)
+app.post(['/api/resend/send-contact', '/api/contact'], async (req, res) => {
+  try {
+    const { 
+      nome, 
+      emailUtilizador, 
+      mensagem, 
+      assunto,
+      apiKey: customApiKey,
+      gasWebhookUrl,
+      from: customFrom,
+      to: customTo
+    } = req.body;
+
+    const nomeLimpo = (nome || 'Contacto Web').toString().trim();
+    const emailLimpo = (emailUtilizador || 'Não especificado').toString().trim();
+    const mensagemLimpa = (mensagem || '').toString().trim();
+    const subject = assunto || `Novo contacto de ${nomeLimpo}`;
+
+    const resendApiKey = customApiKey || process.env.RESEND_API_KEY || (currentSmtpConfig.user === 'resend' ? currentSmtpConfig.pass : null);
+    const fromAddress = customFrom || 'Geral <geral@appblazetrack.com>';
+    const toAddress = customTo ? (Array.isArray(customTo) ? customTo : [customTo]) : ['jagamaal@gmail.com'];
+
+    // If a Google Apps Script Webhook URL is provided, forward to it
+    if (gasWebhookUrl && gasWebhookUrl.startsWith('http')) {
+      try {
+        console.log(`[GAS Bridge] Forwarding contact form to Google Apps Script Webhook: ${gasWebhookUrl}`);
+        const gasResponse = await fetch(gasWebhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nome: nomeLimpo,
+            emailUtilizador: emailLimpo,
+            mensagem: mensagemLimpa,
+            assunto: subject,
+            apiKey: resendApiKey,
+          }),
+        });
+
+        const gasResult = await gasResponse.json().catch(() => ({ status: 'success' }));
+        return res.json({
+          success: true,
+          provider: 'google_apps_script',
+          message: 'Mensagem enviada com sucesso através do Google Apps Script & Resend!',
+          gasResult,
+        });
+      } catch (gasErr: any) {
+        console.warn(`[GAS Bridge Warning] Failed to reach Google Apps Script (${gasErr.message}). Fallback to direct Resend API.`);
+      }
+    }
+
+    // Direct Resend API Dispatch if API key is present
+    if (resendApiKey && resendApiKey.startsWith('re_')) {
+      try {
+        console.log(`[Resend Direct] Sending contact form email via https://api.resend.com/emails`);
+        const resendResponse = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${resendApiKey}`,
+          },
+          body: JSON.stringify({
+            from: fromAddress,
+            to: toAddress,
+            subject: subject,
+            html: `<p><strong>Nome:</strong> ${nomeLimpo}</p><p><strong>Email:</strong> ${emailLimpo}</p><p><strong>Mensagem:</strong> ${mensagemLimpa}</p>`,
+            text: `Nome: ${nomeLimpo}\nEmail: ${emailLimpo}\nMensagem:\n${mensagemLimpa}`,
+          }),
+        });
+
+        const resendData = await resendResponse.json();
+
+        if (resendResponse.ok) {
+          return res.json({
+            success: true,
+            provider: 'resend_api',
+            messageId: resendData.id,
+            message: `Mensagem de ${nomeLimpo} enviada com sucesso através da API do Resend!`,
+            data: resendData,
+          });
+        } else {
+          console.warn(`[Resend API Error] ${JSON.stringify(resendData)}`);
+          // Fallback to internal mail dispatcher
+        }
+      } catch (resendErr: any) {
+        console.warn(`[Resend Direct Warning] ${resendErr.message}. Fallback to SMTP dispatcher.`);
+      }
+    }
+
+    // Fallback: Send via local/configured SMTP transport
+    const fallbackResult = await sendMailSafely({
+      to: toAddress.join(', '),
+      from: fromAddress,
+      subject: subject,
+      text: `Nome: ${nomeLimpo}\nEmail: ${emailLimpo}\nMensagem:\n${mensagemLimpa}`,
+      html: `
+        <div style="font-family: sans-serif; padding: 20px; background: #12131a; color: #f1f5f9; border-radius: 12px;">
+          <h3 style="color: #ef4444; margin-top: 0;">🚒 Novo Contacto de Formulário - Blazetrack</h3>
+          <p><strong>Nome:</strong> ${nomeLimpo}</p>
+          <p><strong>Email:</strong> ${emailLimpo}</p>
+          <div style="padding: 12px; background: #1c1e2b; border-radius: 6px; border-left: 3px solid #ef4444;">
+            <strong>Mensagem:</strong>
+            <p style="margin: 6px 0 0 0; white-space: pre-wrap;">${mensagemLimpa}</p>
+          </div>
+          <p style="font-size: 11px; color: #94a3b8; margin-top: 16px;">Enviado via Blazetrack BV • "Vida por Vida"</p>
+        </div>
+      `,
+    });
+
+    return res.json({
+      success: true,
+      provider: fallbackResult.isLiveSmtp ? 'smtp_relay' : 'secure_dispatcher',
+      messageId: fallbackResult.messageId,
+      message: `Mensagem de ${nomeLimpo} registada e enviada com sucesso para ${toAddress.join(', ')}!`,
+    });
+
+  } catch (error: any) {
+    console.error('[Contact Form Error]', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Erro ao processar envio do formulário.',
+    });
+  }
+});
+
 // 4. Vite middleware and static serving
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {

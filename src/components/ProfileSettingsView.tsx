@@ -45,6 +45,8 @@ import {
   updateActiveAccountFromProfile 
 } from '../services/authService';
 import { EmailServiceConfigModal } from './EmailServiceConfigModal';
+import { ContactFormModal } from './ContactFormModal';
+import { MessageSquare, Code2 } from 'lucide-react';
 
 interface ProfileSettingsViewProps {
   profile: UserProfile;
@@ -123,6 +125,7 @@ export const ProfileSettingsView: React.FC<ProfileSettingsViewProps> = ({
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [emailSentResult, setEmailSentResult] = useState<EmailDispatchResult | null>(null);
   const [isEmailConfigModalOpen, setIsEmailConfigModalOpen] = useState(false);
+  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
 
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -734,7 +737,17 @@ export const ProfileSettingsView: React.FC<ProfileSettingsViewProps> = ({
                   <span className="flex items-center space-x-1 text-emerald-400"><FileCode className="w-3.5 h-3.5" /><span>JSON</span></span>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsContactModalOpen(true)}
+                    className="px-3 py-2 bg-[#201814] hover:bg-[#2c1f18] border border-orange-700/50 text-orange-300 hover:text-orange-200 rounded-xl text-xs font-bold flex items-center space-x-1.5 cursor-pointer transition-colors"
+                    title="Enviar mensagem através do formulário com Resend & Spaceship"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5 text-orange-400" />
+                    <span>Formulário de Contacto (Resend)</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => setIsEmailConfigModalOpen(true)}
@@ -1088,6 +1101,13 @@ export const ProfileSettingsView: React.FC<ProfileSettingsViewProps> = ({
       <EmailServiceConfigModal
         isOpen={isEmailConfigModalOpen}
         onClose={() => setIsEmailConfigModalOpen(false)}
+        profile={profile}
+      />
+
+      {/* Resend & Google Apps Script Contact Form Modal */}
+      <ContactFormModal
+        isOpen={isContactModalOpen}
+        onClose={() => setIsContactModalOpen(false)}
         profile={profile}
       />
     </div>

@@ -20,7 +20,8 @@ import {
   Users,
   LogOut,
   Database,
-  RefreshCw
+  RefreshCw,
+  MessageSquare
 } from 'lucide-react';
 import { ActiveTab, UserProfile, ActiveShiftTimer } from '../types';
 import { isSupabaseConfigured, SUPABASE_PROJECT_NAME } from '../services/supabase';
@@ -35,6 +36,7 @@ interface SidebarProps {
   onOpenGoogleAuth: () => void;
   onOpenAuthModal?: () => void;
   onOpenSupabaseConnect?: () => void;
+  onOpenContactModal?: () => void;
   onSyncSupabase?: () => void;
   isSyncingSupabase?: boolean;
   onLockApp: () => void;
@@ -51,6 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenGoogleAuth,
   onOpenAuthModal,
   onOpenSupabaseConnect,
+  onOpenContactModal,
   onSyncSupabase,
   isSyncingSupabase,
   onLockApp,
@@ -311,6 +314,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <Settings className="w-4 h-4 text-zinc-400" />
             <span>Definições</span>
           </button>
+
+          {onOpenContactModal && (
+            <button
+              onClick={() => {
+                onOpenContactModal();
+                setIsMobileOpen(false);
+              }}
+              className="w-full flex items-center space-x-3.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-orange-400/90 hover:text-orange-300 hover:bg-orange-950/30 border border-orange-900/30 transition-all cursor-pointer"
+              title="Enviar mensagem através do formulário com Resend"
+            >
+              <MessageSquare className="w-4 h-4 text-orange-400" />
+              <span>Apoio & Contacto (Resend)</span>
+            </button>
+          )}
 
           {profile.pinEnabled ? (
             <button
